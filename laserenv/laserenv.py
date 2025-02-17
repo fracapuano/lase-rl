@@ -1,3 +1,5 @@
+import line_profiler
+
 import torch
 torch.set_num_threads(1)
 
@@ -176,7 +178,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         central_window = extract_central_window(frog_trace, window_size=128)
         
         # normalize to [0, 255] as per the observation space requirements
-        return 255 * central_window
+        return 255 * central_window.reshape(1, *central_window.shape)
 
     def _get_info(self, terminated:Optional[bool]=None, truncated:Optional[bool]=None, reward_components:Optional[dict]=None): 
         """Return state-related info."""
@@ -282,6 +284,7 @@ class FROGLaserEnv(AbstractBaseLaser):
 
         return final_reward, components
 
+    @line_profiler.profile
     def step(self, action:torch.TensorType)->Tuple[np.ndarray, float, bool, bool, dict]:
         """
         Applies given action on laser env. Returns observation, reward, terminated, truncated, info
