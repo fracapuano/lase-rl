@@ -1,3 +1,5 @@
+import line_profiler
+
 import numpy as np
 from numpy.fft import fft, ifft, fftshift, fftfreq, ifftshift
 from scipy.interpolate import interp1d
@@ -75,6 +77,7 @@ def compute_temporal_electrical_field(
     
     return field_time
 
+@line_profiler.profile
 def compute_frog_trace(
         E_time: np.ndarray, 
         dt: float,

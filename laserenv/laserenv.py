@@ -1,5 +1,3 @@
-import line_profiler
-
 import torch
 torch.set_num_threads(1)
 
@@ -178,7 +176,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         central_window = extract_central_window(frog_trace, window_size=128)
         
         # normalize to [0, 255] as per the observation space requirements
-        return 255 * central_window.reshape(1, *central_window.shape)
+        return 255 * central_window
 
     def _get_info(self, terminated:Optional[bool]=None, truncated:Optional[bool]=None, reward_components:Optional[dict]=None): 
         """Return state-related info."""
@@ -284,7 +282,6 @@ class FROGLaserEnv(AbstractBaseLaser):
 
         return final_reward, components
 
-    @line_profiler.profile
     def step(self, action:torch.TensorType)->Tuple[np.ndarray, float, bool, bool, dict]:
         """
         Applies given action on laser env. Returns observation, reward, terminated, truncated, info
@@ -412,23 +409,15 @@ class FROGLaserEnv(AbstractBaseLaser):
     
     def _render_frame(self):
         """
-        Renders one frame using Pygame or returns RGB arrays depending on render_mode.
+        Renders one frame only using Pygame.
         """
-        # Get the visualization arrays - adjust transposition to match desired orientation
-        pulse_rgb_array = np.transpose(self._render_pulse(), axes=(1, 0, 2))
-        controls_rgb_array = np.transpose(self._render_controls(), axes=(1, 0, 2))
-        frog_rgb_array = np.transpose(self._render_frog(), axes=(1, 0, 2))
-
         if self.render_mode == "rgb_array":
-            # For rgb_array mode, combine the three arrays horizontally
-            combined = np.concatenate([pulse_rgb_array, controls_rgb_array, frog_rgb_array], axis=0)
-            # Final transpose to get the correct orientation
-            return np.transpose(combined, axes=(1, 0, 2))
-
+            return np.transpose(self._render_pulse(), axes=(1, 0, 2))
+        
         elif self.render_mode == "human":
-            screen_size = (960, 240)  # Three panels: each 320 x 240
+            # Updated screen size to accommodate three panels
+            screen_size = (960, 240)  # Increased width for third panel
 
-            # Initialize Pygame window and clock if necessary
             if getattr(self, "window", None) is None:
                 pygame.init()
                 pygame.display.init()
@@ -437,38 +426,51 @@ class FROGLaserEnv(AbstractBaseLaser):
             if getattr(self, "clock", None) is None:
                 self.clock = pygame.time.Clock()
 
-            # Process events and check for the QUIT event
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    self.close()
-                    return None
-
-            # Create and scale surfaces for each panel
+                    pygame.quit()
+            
+            # Get all three visualization arrays
+            pulse_rgb_array = np.transpose(
+                self._render_pulse(), 
+                axes=(1, 0, 2)
+            )
+            controls_rgb_array = np.transpose(
+                self._render_controls(), 
+                axes=(1, 0, 2)
+            )
+            frog_rgb_array = np.transpose(
+                self._render_frog(), 
+                axes=(1, 0, 2)
+            )
+            
+            # Create surfaces for all three panels
+            pulses_surf = pygame.surfarray.make_surface(pulse_rgb_array)
+            controls_surf = pygame.surfarray.make_surface(controls_rgb_array)
+            frog_surf = pygame.surfarray.make_surface(frog_rgb_array)
+            
+            # Scale surfaces to fit one-third of the screen width each
             panel_width = screen_size[0] // 3
             pulses_surf = pygame.transform.scale(
-                pygame.surfarray.make_surface(pulse_rgb_array), 
+                pulses_surf, 
                 (panel_width, screen_size[1])
             )
             controls_surf = pygame.transform.scale(
-                pygame.surfarray.make_surface(controls_rgb_array), 
+                controls_surf, 
                 (panel_width, screen_size[1])
             )
             frog_surf = pygame.transform.scale(
-                pygame.surfarray.make_surface(frog_rgb_array), 
-                (panel_width, screen_size[1])
+                frog_surf, (panel_width, screen_size[1])
             )
-
-            # Blit (draw) the surfaces onto the window
+            
+            # Blit all three surfaces
             self.window.blit(pulses_surf, (0, 0))
             self.window.blit(controls_surf, (panel_width, 0))
             self.window.blit(frog_surf, (2 * panel_width, 0))
-
-            # Update the display
-            pygame.display.flip()
+            
+            pygame.event.pump()
             self.clock.tick(self.metadata["render_fps"])
-
-            # Return the same format as rgb_array mode for consistency
-            return np.transpose(pygame.surfarray.array3d(self.window), (1, 0, 2))
+            pygame.display.flip()
 
     def close(self):
         if getattr(self, "window", None) is not None:

@@ -1,3 +1,5 @@
+import line_profiler
+
 import torch
 import numpy as np
 import pandas as pd
@@ -187,6 +189,7 @@ class ComputationalLaser:
         # return time scale and temporal profile of the (controlled) pulse
         return physics.temporal_profile(frequency=self.frequency, field=y3_frequency, npoints_pad=self.pad_points)
     
+    @line_profiler.profile
     def control_to_frog(
             self, 
             control:torch.Tensor, 
