@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import pandas as pd
 from scipy.constants import c
-from typing import Tuple
+from typing import Tuple, Optional
 
 from laserenv.utils import (
     physics,
@@ -21,8 +21,8 @@ class ComputationalLaser:
                 num_points_padding: int = int(3e4), 
                 B: float = 2, 
                 central_frequency: float = (c/(1030*1e-9)), 
-                cristal_frequency: torch.Tensor = None, 
-                cristal_intensity: torch.Tensor = None
+                cristal_frequency: Optional[torch.Tensor]=None, 
+                cristal_intensity: Optional[torch.Tensor]=None
                 ) -> None:
         """Init function. 
         This model is initialized for a considered intensity in the frequency domain signal. The signal is assumed to be already cleaned. 
@@ -79,6 +79,25 @@ class ComputationalLaser:
             self.yb_intensity = torch.from_numpy(yb_field ** 2)
             self.yb_field = torch.from_numpy(yb_field)
 
+    def overwrite_B_integral(self, new_B: float) -> None: 
+        """This function overwrites the B-integral value.
+
+        Args:
+            new_B (float): New B-integral value.
+        """
+        self.B = new_B
+
+    def overwrite_compressor_params(
+            self, 
+            new_compressor_params: Tuple[float, float, float]
+        ) -> None:
+        """This function overwrites the compressor parameters.
+
+        Args:
+            new_compressor_params (Tuple[float, float, float]): New compressor parameters.
+        """
+        self.compressor_params = new_compressor_params
+    
     def translate_control(self, control: torch.Tensor, verse: str = "to_gdd") -> torch.Tensor: 
         """This function translates the control quantities either from Dispersion coefficients (the d_i's) to GDD, TOD and FOD using a system of linear equations 
         defined for this very scope or the other way around, according to the string "verse".  
