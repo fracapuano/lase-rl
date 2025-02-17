@@ -5,7 +5,7 @@ import numpy as np
 from collections import deque
 
 from laserenv.utils.physics import peak_on_peak
-
+from laserenv.env_utils import extract_central_window
 
 def visualize_pulses(
     pulse:List[torch.TensorType], 
@@ -27,7 +27,7 @@ def visualize_pulses(
         target_pulse
     )
         
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(dpi=200)
     # plotting
     ax.plot(
         time.numpy(), 
@@ -54,9 +54,9 @@ def visualize_controls(
         controls_buffer:deque
 ):
     """Renders a series of observation in the control space."""
-    controls = np.array(controls_buffer, dtype=object)
+    controls = np.vstack(controls_buffer)
     
-    fig = plt.figure()
+    fig = plt.figure(dpi=200)
     ax = fig.add_subplot(projection = "3d")
     # setting bounds to the plot
     ax.set_xlim3d(0,1)
@@ -73,7 +73,7 @@ def visualize_controls(
     line.set_data(GDDs, TODs); line.set_3d_properties(FODs)
     # scatter plot of applied controls
     scatt._offsets3d = GDDs, TODs, FODs
-    ax.legend(loc = "upper right", framealpha=1., fontsize=12)
+    ax.legend(loc="upper right", framealpha=1., fontsize=12)
 
     return fig, ax
 
@@ -95,3 +95,4 @@ def visualize_frog(
     ax.axis("off")
     
     return fig, ax
+
