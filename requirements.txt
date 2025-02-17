@@ -1,0 +1,11 @@
+matplotlib
+numpy
+pandas
+rich
+sb3_contrib
+scipy
+stable_baselines3
+torch
+wandb
+gymnasium
+pygame
