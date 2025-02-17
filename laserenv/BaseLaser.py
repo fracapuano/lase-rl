@@ -42,9 +42,10 @@ class AbstractBaseLaser(gym.Env):
             B_integral=self._B
         )
         # abstracts observation and action space
-        self._observation = None
-        self._observation_space = None
+        self.observation_space = None
         self.action_space = None
+        # initial set of control parameters applied is None
+        self._psi = None
         self._seed = seed
 
     def seed(self, seed:int):
