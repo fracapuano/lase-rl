@@ -73,6 +73,25 @@ def visualize_controls(
     line.set_data(GDDs, TODs); line.set_3d_properties(FODs)
     # scatter plot of applied controls
     scatt._offsets3d = GDDs, TODs, FODs
-    ax.legend(loc = "upper right", framealpha = 1., fontsize=12)
+    ax.legend(loc = "upper right", framealpha=1., fontsize=12)
 
+    return fig, ax
+
+def visualize_frog(
+    frog: torch.Tensor,
+    window_size: int=128
+):
+    """Visualizes a FROG trace."""
+    central_window = extract_central_window(
+        frog, 
+        window_size
+    )
+    fig, ax = plt.subplots(dpi=200)
+    ax.imshow(
+        central_window, 
+        cmap="gray"
+    )
+    ax.set_title("FROG Trace", fontsize=12)
+    ax.axis("off")
+    
     return fig, ax
