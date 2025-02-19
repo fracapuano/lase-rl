@@ -225,7 +225,9 @@ class FROGLaserEnv(AbstractBaseLaser):
             torch.ones(self.action_dim)
         )
 
+        # Clear the buffer and add initial control
         self.controls_buffer.clear()
+        self.controls_buffer.append(self.psi)
 
         return self._get_obs(), self._get_info()
 
