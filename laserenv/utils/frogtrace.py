@@ -49,10 +49,10 @@ def spectral_phase(
     return phase
 
 def compute_temporal_electrical_field(
-        spectrum: np.ndarray, 
-        phase: np.ndarray, 
+        spectrum: torch.Tensor, 
+        phase: torch.Tensor, 
         pad_width: int=10000
-    ) -> np.ndarray:
+    ) -> torch.Tensor:
     """
     Compute the temporal electric field from a spectral amplitude and phase.
 
@@ -60,21 +60,21 @@ def compute_temporal_electrical_field(
     and the inverse FFT is applied to recover the time-domain field.
 
     Args:
-        spectrum (np.ndarray): 1D spectral amplitude array.
-        phase (np.ndarray): Spectral phase array (radians).
+        spectrum (torch.Tensor): 1D spectral amplitude array.
+        phase (torch.Tensor): Spectral phase array (radians).
         pad_width (int): Number of zeros to pad at each end.
 
     Returns:
-        np.ndarray: Normalized complex temporal electric field.
+        torch.Tensor: Normalized complex temporal electric field.
     """
-    padded_spectrum = np.pad(spectrum, pad_width, mode='constant', constant_values=0)
-    padded_phase = np.pad(phase, pad_width, mode='constant', constant_values=0)
-    field_freq = padded_spectrum * np.exp(1j * padded_phase)
+    padded_spectrum = torch.nn.functional.pad(spectrum, (pad_width, pad_width), mode='constant', value=0)
+    padded_phase = torch.nn.functional.pad(phase, (pad_width, pad_width), mode='constant', value=0)
+    field_freq = padded_spectrum * torch.exp(1j * padded_phase)
     
     # The fftshift/ifftshift combination ensures the correct frequency ordering.
     field_time = ifftshift(ifft(fftshift(field_freq)))
     # Normalize to unit maximum amplitude
-    field_time /= np.abs(field_time).max()
+    field_time /= torch.abs(field_time).max()
     
     return field_time
 
@@ -167,7 +167,11 @@ def generate_frog_trace(
     # Compute the spectral phase.
     phase = spectral_phase(freq, central_frequency, gdd, tod, fod)
     # Compute the temporal field (with zero padding)
-    E_time = compute_temporal_electrical_field(spectrum, phase, pad_width=pad_width)
+    E_time = compute_temporal_electrical_field(
+        torch.from_numpy(spectrum), 
+        torch.from_numpy(phase), 
+        pad_width=pad_width
+    )
 
     # Determine the frequency step from the original grid (assumed uniform).
     df = freq[1] - freq[0]
@@ -179,7 +183,8 @@ def generate_frog_trace(
         E_time, 
         dt, 
         pad_width=pad_width,
-        trim_window=trim_window
+        trim_window=trim_window,
+        compute_axes=True
     )
 
     # Compute the wavelength axis for the SHG trace.
@@ -218,9 +223,9 @@ if __name__ == "__main__":
     spectrum_uniform = interp_amplitude(freq_uniform)
 
     # Set dispersion parameters (adjust these as needed).
-    gdd = 10
-    tod = 10
-    fod = 1
+    gdd = 0
+    tod = 0
+    fod = 0
 
     # Generate the FROG trace.
     frog, delay_axis, wavelength_axis = generate_frog_trace(
