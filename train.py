@@ -15,7 +15,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="PPO", choices=["PPO", "SAC"],
                       help="RL algorithm to use")
-    parser.add_argument("--total-timesteps", type=int, default=1_000_000,
+    parser.add_argument("--timesteps", type=int, default=1_000_000,
                       help="Total timesteps for training")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                       help="Learning rate")
@@ -35,7 +35,7 @@ def main():
         config={
             "policy": "CnnPolicy",
             "algorithm": args.algo,
-            "total_timesteps": args.total_timesteps,
+            "timesteps": args.timesteps,
             "learning_rate": args.learning_rate,
             "seed": args.seed,
             "frame_stack": 5,
@@ -55,7 +55,8 @@ def main():
         env = FROGLaserEnv(
             bounds=bounds,
             compressor_params=compressor_params,
-            B_integral=B_integral
+            B_integral=B_integral,
+            device="mps"
         )
 
         env = Monitor(env)
@@ -74,24 +75,25 @@ def main():
     # Initialize the model with selected algorithm
     algo_class = PPO if args.algo == "PPO" else SAC
     model = algo_class(
-        "CnnPolicy",
+        "MultiInputPolicy",
         env,
         learning_rate=args.learning_rate,
         tensorboard_log=f"{run_dir}/tensorboard",
         seed=args.seed,
-        verbose=0
+        verbose=0,
+        device="mps"
     )
 
     # Setup the Wandb callback to log training progress, including gradient information.
-    callback = WandbCallback(
+    wandb_callback = WandbCallback(
         gradient_save_freq=100,
         verbose=2
     )
 
     # Begin training using total_timesteps specified in wandb config
     model.learn(
-        total_timesteps=args.total_timesteps, 
-        callback=callback, 
+        total_timesteps=args.timesteps, 
+        callback=[wandb_callback], 
         progress_bar=True
     )
 
