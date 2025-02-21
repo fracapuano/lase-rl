@@ -5,17 +5,34 @@ from wandb.integration.sb3 import WandbCallback
 from laserenv.LaserEnv import FROGLaserEnv
 from laserenv.env_utils import EnvParametrization
 
-from stable_baselines3.common.vec_env import DummyVecEnv, VecVideoRecorder, VecFrameStack
+from stable_baselines3.common.vec_env import (
+    DummyVecEnv,
+    SubprocVecEnv,
+    VecVideoRecorder, 
+    VecFrameStack
+)
 from stable_baselines3.common.monitor import Monitor
 
 import os
+import torch
 import argparse
+
+def get_device(return_cpu:bool=False):
+    if return_cpu:
+        return "cpu"
+    else:
+        if torch.backends.mps.is_available():
+            return "mps"
+        elif torch.cuda.is_available():
+            return "cuda"
+        else:
+            return "cpu"
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="PPO", choices=["PPO", "SAC"],
                       help="RL algorithm to use")
-    parser.add_argument("--timesteps", type=int, default=1_000_000,
+    parser.add_argument("--timesteps", type=int, default=100_000,
                       help="Total timesteps for training")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                       help="Learning rate")
@@ -27,6 +44,8 @@ def parse_args():
 
 def main():
     args = parse_args()
+    n_envs = 1
+    device = get_device(return_cpu=False)
     
     run = wandb.init(
         project="RLC-Laser",
@@ -39,6 +58,7 @@ def main():
             "learning_rate": args.learning_rate,
             "seed": args.seed,
             "frame_stack": 5,
+            "n_envs": n_envs
         },
     )
     
@@ -51,18 +71,17 @@ def main():
     compressor_params, bounds, B_integral = params.get_parametrization()
 
     def make_env():
-        # Create the environment (without rendering)
         env = FROGLaserEnv(
             bounds=bounds,
             compressor_params=compressor_params,
             B_integral=B_integral,
-            device="mps"
+            device=device
         )
 
         env = Monitor(env)
         return env
 
-    env = DummyVecEnv([make_env])
+    env = DummyVecEnv([make_env for _ in range(n_envs)])
     env = VecFrameStack(env, n_stack=5)
     env = VecVideoRecorder(
         env,
@@ -70,7 +89,6 @@ def main():
         record_video_trigger=lambda x: x % args.eval_every == 0,
         video_length=20
     )
-
 
     # Initialize the model with selected algorithm
     algo_class = PPO if args.algo == "PPO" else SAC
@@ -93,7 +111,7 @@ def main():
     # Begin training using total_timesteps specified in wandb config
     model.learn(
         total_timesteps=args.timesteps, 
-        callback=[wandb_callback], 
+        callback=wandb_callback, 
         progress_bar=True
     )
 
@@ -105,3 +123,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
