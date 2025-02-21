@@ -1,4 +1,5 @@
 import line_profiler
+from typing import Union, Tuple
 
 import torch
 import numpy as np
@@ -85,7 +86,7 @@ def compute_frog_trace(
         trim_window: int=1000,
         pad_width: int=10_000,
         compute_axes: bool=False
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor, torch.Tensor]]:
     """
     GPU-accelerated FROG trace computation using PyTorch.
     """

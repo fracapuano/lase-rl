@@ -7,5 +7,7 @@ scipy
 stable_baselines3
 torch
 wandb
-gymnasium
+gymnasium[other]
 pygame
+tensorboard
+line_profiler

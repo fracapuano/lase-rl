@@ -229,18 +229,18 @@ class ComputationalLaser:
         Returns:
             torch.Tensor: The FROG trace of the pulse for the given control.
         """
-        control = control.to(self.device)
+        control = control.type(torch.float16).to(self.device)
         # control quantities regulate the phase
         phi_stretcher = self.emit_phase(control=control)
         # phase imposed on the input field
         y1_frequency = physics.impose_phase(
-            spectrum=self.field.type(torch.float32).to(phi_stretcher.device), 
+            spectrum=self.field.type(torch.float16).to(phi_stretcher.device), 
             phase=phi_stretcher
         )
         # spectrum amplified by DIRA crystal gain
         y1tilde_frequency = physics.yb_gain(
             signal=y1_frequency, 
-            intensity_yb=self.yb_field.type(torch.float32).to(y1_frequency.device)
+            intensity_yb=self.yb_field.type(torch.float16).to(y1_frequency.device)
         )
         # spectrum amplified in time domain, to apply non linear phase to it
         y1tilde_time = torch.fft.ifft(y1tilde_frequency)
@@ -255,7 +255,7 @@ class ComputationalLaser:
         phi_compressor = self.emit_phase(
             control=(
                 self.compressor_params * torch.tensor([1e24, 1e36, 1e48], dtype=torch.float64)
-            ).type(torch.float32)
+            ).type(torch.float16)
         )
         # imposing compressor phase on spectrum
         y3_frequency = physics.impose_phase(
