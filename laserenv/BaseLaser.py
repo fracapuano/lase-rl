@@ -14,6 +14,7 @@ class AbstractBaseLaser(gym.Env):
                  compressor_params:torch.TensorType,
                  B_integral:float, 
                  render_mode:str=None, 
+                 device:str="cpu",
                  seed:int=None):
         """Init function. Here laser-oriented characteristics are defined.
         Args: 
@@ -26,6 +27,7 @@ class AbstractBaseLaser(gym.Env):
                                           the higher the non-linearity introduced in the model.
             render_mode (str, optional): Render mode. Defaults to None.
         """
+        self.device = device
         self._bounds = bounds
         
         """
@@ -39,8 +41,10 @@ class AbstractBaseLaser(gym.Env):
         # instantiate the considered laser model
         self.laser = instantiate_laser(
             compressor_params=self._compressor_params, 
-            B_integral=self._B
+            B_integral=self._B,
+            device=device
         )
+        
         # abstracts observation and action space
         self.observation_space = None
         self.action_space = None

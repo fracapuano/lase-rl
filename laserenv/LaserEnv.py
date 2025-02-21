@@ -6,7 +6,7 @@ torch.set_num_threads(1)
 import numpy as np
 from typing import Tuple, List
 from collections import deque
-from gymnasium.spaces import Box
+from gymnasium.spaces import Box, Dict
 from torch.distributions.multivariate_normal import MultivariateNormal
 
 import pygame
@@ -57,15 +57,23 @@ class FROGLaserEnv(AbstractBaseLaser):
             compressor_params=compressor_params,
             B_integral=B_integral,
             bounds=bounds,
-            render_mode=render_mode
+            render_mode=render_mode, 
+            device=device
         )
-        self.device = device
         """Specifying observation space"""
+        self.psi_dim = 3
         
-        # specifiying obs space, as 128x128 B&W FROG traces
-        self.observation_space = Box(
-            low=0, high=255, shape=(1, 128, 128), dtype=np.uint8
-        )
+        # specifiying obs space, as Dict containing:
+        # - 128x128 B&W FROG traces (Box space)
+        # - current control parameters psi (Box space)
+        self.observation_space = Dict({
+            "frog_trace": Box(
+                low=0, high=255, shape=(1, 128, 128), dtype=np.uint8
+            ),
+            "psi": Box(
+                low=0.0, high=1.0, shape=(self.psi_dim,), dtype=np.float32
+            )
+        })
 
         """Parsing action-dependant parameters"""
         # custom bounds for env
@@ -125,26 +133,27 @@ class FROGLaserEnv(AbstractBaseLaser):
     
     @psi.setter
     def psi(self, value: torch.Tensor):
-        self._psi = value
+        self._psi=value
     
     @property
-    def psi_SI(self):
+    def psi_picoseconds(self):
         """
-        Returns control parameters in SI units. 
-        SI-units control parameters only are accepted as inputs to the ComputationalLaser considered.
+        Returns control parameters in bounds, expressed in picoseconds^k.
+        Expressing control parameters in picoseconds allows to express them in float32,
+        allowing for MPS compatibility in acceleration.
         """
-        return self.control_utils.remagnify_descale(self.psi)
+        return self.control_utils.descale_control(self.psi).type(torch.float32)
     
     @property
     def pulse(self):
         """Returns the temporal profile of the pulse that derives from the current observation"""
-        time, control_shape = self.laser.control_to_temporal(self.psi_SI)
+        time, control_shape = self.laser.control_to_temporal(self.psi_picoseconds)
         return (time, control_shape)
     
     @property
     def frog(self):
         """Returns the FROG trace of the current control parameter."""
-        return self.laser.control_to_frog(self.psi_SI)
+        return self.laser.control_to_frog(self.psi_picoseconds)
     
     @property
     def pulse_FWHM(self):
@@ -165,29 +174,34 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         # move target and controlled pulse peak on peak
         pulse1, pulse2 = physics.peak_on_peak(
-             temporal_profile=[time, control_shape], 
-             other=[target_time, target_shape]
-             )
+            temporal_profile=[time.cpu(), control_shape.cpu()], 
+            other=[target_time.cpu(), target_shape.cpu()]
+            )
         
         # compute sum(L1 loss)
         return (pulse1[1] - pulse2[1]).abs().sum().item()
 
+    @line_profiler.profile
     def _get_obs(self): 
         """Return observation."""
-        frog_trace = self.frog
+        frog_trace = self.frog.cpu().numpy()  # Move to CPU only at the end
         central_window = extract_central_window(frog_trace, window_size=128)
         
-        # normalize to [0, 255] as per the observation space requirements
         return {
             "frog_trace": 255 * central_window.reshape(1, *central_window.shape).astype(np.uint8),
             "psi": self.psi.cpu().numpy()
         }
 
-    def _get_info(self, terminated:Optional[bool]=None, truncated:Optional[bool]=None, reward_components:Optional[dict]=None): 
+    def _get_info(
+            self, 
+            terminated:Optional[bool]=None, 
+            truncated:Optional[bool]=None, 
+            reward_components:Optional[dict]=None
+        ) -> dict:
         """Return state-related info."""
         info = {
             "current_control": self.psi,
-            "current_control (SI)": self.psi_SI,
+            "current_control (picoseconds)": self.psi_picoseconds,
             "current FWHM (ps)": self.pulse_FWHM,
             "current Peak Intensity (TW/m^2)": self.peak_intensity * 1e-12,
             "TL-L1Loss": self.transform_limited_regret(),
@@ -243,7 +257,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             bool: True if pulse_FWHM is equal to or exceeds MAX_DURATION.
         """
         terminated = self.pulse_FWHM >= self.MAX_DURATION
-        return terminated
+        return bool(terminated)
 
     def is_truncated(self) -> bool:
         """
@@ -253,9 +267,9 @@ class FROGLaserEnv(AbstractBaseLaser):
             bool: True if the number of steps n_steps is equal or exceeds MAX_STEPS.
         """
         truncated = self.n_steps >= self.MAX_STEPS
-        return truncated
+        return bool(truncated)
 
-    def compute_reward(self)->float:
+    def get_reward(self)->float:
         """
         This function computes the reward associated with the (state, action) pair. 
         This reward function is made up of several different components and derives from fundamental assumptions
@@ -281,10 +295,10 @@ class FROGLaserEnv(AbstractBaseLaser):
 
         final_reward = alive_component + intensity_component + duration_component + control_component
         components = {
-            "alive_component": alive_component,
+            "alive_component": alive_component * 10,
             "intensity_component": intensity_component,
-            "duration_component": duration_component,
-            "control_component": control_component
+            "duration_component": duration_component * (-10),
+            "control_component": control_component * (-1)
         }
 
         return final_reward, components
@@ -306,8 +320,8 @@ class FROGLaserEnv(AbstractBaseLaser):
             torch.ones(self.action_dim)
         )
         
-        self.controls_buffer.append(self._psi)
-        reward, components = self.compute_reward()
+        self.controls_buffer.append(self.psi)
+        reward, components = self.get_reward()
         terminated = self.is_terminated()
         truncated = self.is_truncated()
         info = self._get_info(
@@ -316,8 +330,8 @@ class FROGLaserEnv(AbstractBaseLaser):
             reward_components=components
         )
 
-        if terminated: 
-            reward -= 20  # penalty for terminating the episode
+        if terminated:
+            reward -= 5  # penalty for terminating the episode
         
         return self._get_obs(), reward, terminated, truncated, info
     
@@ -401,7 +415,7 @@ class FROGLaserEnv(AbstractBaseLaser):
     
     def _render_frog(self)->np.array:
         """Renders FROG trace."""
-        fig, ax = visualize_frog(self.frog)
+        fig, ax = visualize_frog(self.frog.cpu().numpy())
 
         fig.canvas.draw()
         X = np.array(fig.canvas.renderer.buffer_rgba())

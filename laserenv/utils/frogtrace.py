@@ -1,7 +1,8 @@
 import line_profiler
 
+import torch
 import numpy as np
-from numpy.fft import fft, ifft, fftshift, fftfreq, ifftshift
+from torch.fft import fft, ifft, fftshift, fftfreq, ifftshift
 from scipy.interpolate import interp1d
 from scipy.constants import c
 import matplotlib.pyplot as plt
@@ -79,61 +80,50 @@ def compute_temporal_electrical_field(
 
 @line_profiler.profile
 def compute_frog_trace(
-        E_time: np.ndarray, 
+        E_time: torch.Tensor, 
         dt: float,
         trim_window: int=1000,
-        pad_width: int=10_000
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        pad_width: int=10_000,
+        compute_axes: bool=False
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
-    Compute the SHG-FROG trace from the time-domain electric field using a vectorized implementation.
-
-    For each delay τ, this function computes the SHG signal as the product
-        E(t) * E(t - τ)
-    and then applies a Fourier transform along the time axis. Using vectorized
-    operations over all delays (instead of a Python loop) makes this function much faster.
-    
-    Args:
-        E_time (np.ndarray): 1D complex temporal electric field.
-        dt (float): Time step in seconds.
-        trim_window (int, optional): Number of points (centered at the pulse) to keep from the input signal.
-        
-    Returns:
-        tuple:
-            - np.ndarray: 2D (intensity-normalized) FROG trace.
-            - np.ndarray: Delay axis, in seconds.
-            - np.ndarray: Frequency axis, in Hz.
+    GPU-accelerated FROG trace computation using PyTorch.
     """
     if trim_window is not None:
         E_time = E_time[pad_width-trim_window:pad_width+2*trim_window]
     
     N = len(E_time)
-    # Create an index array for time and define delay values
-    idx = np.arange(N)
-    delays = np.arange(-N // 2, N // 2)
-
-    # Build a matrix in which each row is a cyclic shift of E_time
-    E_roll = E_time[(idx[None, :] - delays[:, None]) % N]
-
-    # For each delay, compute the SHG signal (i.e. multiply the original field with the rolled field)
-    product = E_time[None, :] * E_roll
-
-    # Apply ifftshift before the FFT and fftshift after
-    product_shifted = ifftshift(product, axes=1)
-    F = fft(product_shifted, axis=1)
-    F = fftshift(F, axes=1)
-
-    # Compute and normalize the intensity
-    frog_intensity = np.real(np.abs(F) ** 2)
-    frog_intensity /= frog_intensity.max()
-
-    # Create a delay axis, in picoseconds
-    total_time = N * dt
-    delay_axis = np.linspace(-total_time / 2, total_time / 2, N)
-
-    # Frequency axis in Hz from the FFT
-    frequency_axis = fftshift(fftfreq(N, d=np.array(dt)))
+    device = E_time.device
     
-    return frog_intensity, delay_axis, frequency_axis
+    # Create index tensors on GPU
+    idx = torch.arange(N, device=device)
+    delays = torch.arange(-N // 2, N // 2, device=device)
+    
+    # Build the rolling matrix using GPU operations
+    indices = (idx[None, :] - delays[:, None]) % N
+    E_roll = torch.index_select(E_time, 0, indices.flatten()).reshape(len(delays), -1)
+    
+    # Compute SHG signal
+    product = E_time[None, :] * E_roll
+    
+    # FFT operations on GPU
+    product_shifted = ifftshift(product, dim=1)
+    F = fft(product_shifted, dim=1)
+    F = fftshift(F, dim=1)
+    
+    # Compute and normalize intensity
+    frog_intensity = torch.abs(F) ** 2
+    frog_intensity = frog_intensity / frog_intensity.max()
+    
+    if compute_axes:
+        # Create axes (can stay on CPU as they're only used for plotting)
+        total_time = N * dt
+        delay_axis = torch.linspace(-total_time / 2, total_time / 2, N, device="cpu")
+        frequency_axis = fftshift(fftfreq(N, dt, device="cpu"))
+        
+        return frog_intensity, delay_axis, frequency_axis
+    else:
+        return frog_intensity
 
 def generate_frog_trace(
         freq: np.ndarray, 

@@ -24,7 +24,8 @@ class ComputationalLaser:
                 B: float = 2, 
                 central_frequency: float = (c/(1030*1e-9)), 
                 cristal_frequency: Optional[torch.Tensor]=None, 
-                cristal_intensity: Optional[torch.Tensor]=None
+                cristal_intensity: Optional[torch.Tensor]=None,
+                device: str="cpu"
                 ) -> None:
         """Init function. 
         This model is initialized for a considered intensity in the frequency domain signal. The signal is assumed to be already cleaned. 
@@ -38,7 +39,9 @@ class ComputationalLaser:
             B (float, optional): B-integral value. Used to model the non-linear effects that DIRA has on the beam.
             cristal_frequency (torch.Tensor, optional): Frequency (THz) of the amplification in the non-linear crystal at the beginning of DIRA.
             cristal_intensity (torch.Tensor, optional): Intensity of the amplification in the non-linear crystal at the beginning of DIRA.
+            device (str, optional): Device to use for GPU operations. Defaults to "cpu".
         """
+        self.device = device
         self.frequency = frequency * 1e12  # Convert THz to Hz
         self.field = field  # electric field is the square root of intensity
         self.central_frequency = central_frequency
@@ -116,6 +119,8 @@ class ComputationalLaser:
     
     def emit_phase(self, control: torch.Tensor) -> torch.Tensor: 
         """This function returns the phase with respect to the frequency and some control parameters.
+        Runs the phase calculation in float32 to allow for MPS compatibility. Running the operation in float32 requires
+        to use non-SI units for the frequency (THz instead of Hz) and controls (ps^k instead of s^k).
 
         Args:
             control (torch.Tensor): Control parameters to be used to create the phase. 
@@ -124,7 +129,11 @@ class ComputationalLaser:
         Returns:
             torch.Tensor: The phase with respect to the frequency, measured in radians.
         """
-        return physics.phase_equation(frequency=self.frequency, central_frequency=self.central_frequency, control=control)
+        return physics.phase_equation(
+            frequency=(self.frequency * 1e-12).type(torch.float32).to(control.device), 
+            central_frequency=torch.tensor(self.central_frequency * 1e-12, dtype=torch.float32).to(control.device), 
+            control=control
+        )
     
     def transform_limited(self, return_time: bool = True) -> Tuple[torch.Tensor, torch.Tensor]:
         """This function returns the transform limited of the input spectrum.
@@ -167,12 +176,19 @@ class ComputationalLaser:
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: (Time scale, Temporal profile of intensity for the given control).
         """
+        control = control.to(self.device)
         # control quantities regulate the phase
         phi_stretcher = self.emit_phase(control=control)
         # phase imposed on the input field
-        y1_frequency = physics.impose_phase(spectrum=self.field, phase=phi_stretcher)
+        y1_frequency = physics.impose_phase(
+            spectrum=self.field.type(torch.float32).to(phi_stretcher.device), 
+            phase=phi_stretcher
+        )
         # spectrum amplified by DIRA crystal gain
-        y1tilde_frequency = physics.yb_gain(signal=y1_frequency, intensity_yb=self.yb_field)
+        y1tilde_frequency = physics.yb_gain(
+            signal=y1_frequency, 
+            intensity_yb=self.yb_field.type(torch.float32).to(y1_frequency.device)
+        )
         # spectrum amplified in time domain, to apply non linear phase to it
         y1tilde_time = torch.fft.ifft(y1tilde_frequency)
         # defining non-linear DIRA phase
@@ -183,9 +199,16 @@ class ComputationalLaser:
         # back to frequency domain
         y2_frequency = torch.fft.fft(y2_time)
         # defining phase imposed by compressor
-        phi_compressor = self.emit_phase(control=self.compressor_params)
+        phi_compressor = self.emit_phase(
+            control=(
+                self.compressor_params * torch.tensor([1e24, 1e36, 1e48], dtype=torch.float64)
+            ).type(torch.float32)
+        )
         # imposing compressor phase on spectrum
-        y3_frequency = physics.impose_phase(y2_frequency, phase=phi_compressor)
+        y3_frequency = physics.impose_phase(
+            y2_frequency, 
+            phase=phi_compressor.to(y2_frequency.device)
+        )
         # return time scale and temporal profile of the (controlled) pulse
         return physics.temporal_profile(frequency=self.frequency, field=y3_frequency, npoints_pad=self.pad_points)
     
@@ -206,12 +229,19 @@ class ComputationalLaser:
         Returns:
             torch.Tensor: The FROG trace of the pulse for the given control.
         """
+        control = control.to(self.device)
         # control quantities regulate the phase
         phi_stretcher = self.emit_phase(control=control)
         # phase imposed on the input field
-        y1_frequency = physics.impose_phase(spectrum=self.field, phase=phi_stretcher)
+        y1_frequency = physics.impose_phase(
+            spectrum=self.field.type(torch.float32).to(phi_stretcher.device), 
+            phase=phi_stretcher
+        )
         # spectrum amplified by DIRA crystal gain
-        y1tilde_frequency = physics.yb_gain(signal=y1_frequency, intensity_yb=self.yb_field)
+        y1tilde_frequency = physics.yb_gain(
+            signal=y1_frequency, 
+            intensity_yb=self.yb_field.type(torch.float32).to(y1_frequency.device)
+        )
         # spectrum amplified in time domain, to apply non linear phase to it
         y1tilde_time = torch.fft.ifft(y1tilde_frequency)
         # defining non-linear DIRA phase
@@ -222,9 +252,16 @@ class ComputationalLaser:
         # back to frequency domain
         y2_frequency = torch.fft.fft(y2_time)
         # defining phase imposed by compressor
-        phi_compressor = self.emit_phase(control=self.compressor_params)
+        phi_compressor = self.emit_phase(
+            control=(
+                self.compressor_params * torch.tensor([1e24, 1e36, 1e48], dtype=torch.float64)
+            ).type(torch.float32)
+        )
         # imposing compressor phase on spectrum
-        y3_frequency = physics.impose_phase(y2_frequency, phase=phi_compressor)
+        y3_frequency = physics.impose_phase(
+            y2_frequency, 
+            phase=phi_compressor.to(y2_frequency.device)
+        )
 
         y3_frequency = torch.nn.functional.pad(
             input=y3_frequency, 
@@ -234,29 +271,31 @@ class ComputationalLaser:
         )
         
         # compute the FROG trace
-        frog, diff_time, diff_freq = frogtrace.compute_frog_trace(
+        frog_output = frogtrace.compute_frog_trace(
             E_time=y3_frequency, 
             dt=1/self.frequency[0],
             trim_window=trim_window,
-            pad_width=npoints_pad
+            pad_width=npoints_pad,
+            compute_axes=return_axes
         )
-
-        # Compute the wavelength axis for the SHG trace
-        # Convert frequency (Hz) to THz for plotting convenience
-        diff_freq = diff_freq / 1e12
-        # Convert time (s) to ps for plotting convenience
-        diff_time = diff_time * 1e12
-        central_frequency = self.central_frequency / 1e12
-        
-        # For SHG, the effective frequency is shifted by 2x the central frequency.
-        f_shg = diff_freq + 2 * central_frequency  # [THz]
-        # Now convert back to wavelength (nm)
-        diff_wl = (c / (f_shg * 1e12)) * 1e9  # [nm]
-        
         if return_axes:
+            frog, diff_time, diff_freq = frog_output
+            # Compute the wavelength axis for the SHG trace
+            # Convert frequency (Hz) to THz for plotting convenience
+            diff_freq = diff_freq / 1e12
+            # Convert time (s) to ps for plotting convenience
+            diff_time = diff_time * 1e12
+            central_frequency = self.central_frequency / 1e12
+            
+            # For SHG, the effective frequency is shifted by 2x the central frequency.
+            f_shg = diff_freq + 2 * central_frequency  # [THz]
+            # Now convert back to wavelength (nm)
+            diff_wl = (c / (f_shg * 1e12)) * 1e9  # [nm]
+
             return frog, diff_time, diff_wl
-        else: 
-            return frog
+        
+        else:
+            return frog_output
 
 
 if __name__ == "__main__":

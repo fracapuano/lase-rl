@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from scipy.constants import c
 
-from laserenv.utils.torch_utils import iterable_to_cuda
 from scipy.interpolate import UnivariateSpline
 
 from typing import Tuple, Union, List
@@ -56,28 +55,23 @@ def translate_control(central_frequency:float, control:torch.TensorType, verse:s
 
 def phase_equation(frequency:torch.TensorType, central_frequency:float, control:torch.TensorType, use_SI:bool=True) -> torch.tensor: 
     """This function returns the phase with respect to the frequency and some control parameters.
+    This function now allows for computation in both SI and non-SI units (non-SI units are used for MPS 
+    compatibility, since MPS architecture does not support double precision).
 
     Args:
         frequency (torch.tensor): Tensor of frequencies considered (measured in Hz)
         central_frequency (float): Central frequency, not angular (measured in Hz).
-        control (torch.tensor): Control parameters to be used to create the phase. It contains GDD, TOD and FOD in s^2, s^3 and s^4.
-        use_SI (bool, optional): Whether to use SI units or not. Defaults to True. When not, perform a conversion to ps^{2, 3, 4} and THz.
+        control (torch.tensor): Control parameters to be used to create the phase. 
+                                It contains GDD, TOD and FOD in s^2, s^3 and s^4.
     
     Returns:
         torch.tensor: The phase with respect to the frequency, measured in radiants.
     """
     GDD, TOD, FOD = control
-    # translating control and frequency to ps^{2, 3, 4} and THz
-    if not use_SI:
-        GDD, TOD, FOD = GDD * 1e24, TOD * 1e36, FOD * 1e48
-        frequency = frequency * 1e-12
-        central_frequency = torch.tensor(central_frequency, dtype=torch.float64) * 1e-12
-
-    # Casting to float64 to avoid numerical overflow when dealing with SI units
     phase = \
-            (1/2) * GDD * (2*torch.pi * (frequency - central_frequency)).type(torch.float64)**2 + \
-            (1/6) * TOD * (2*torch.pi * (frequency - central_frequency)).type(torch.float64)**3 + \
-            (1/24) * FOD * (2*torch.pi * (frequency - central_frequency)).type(torch.float64)**4
+            (1/2) * GDD * (2*torch.pi * (frequency - central_frequency))**2 + \
+            (1/6) * TOD * (2*torch.pi * (frequency - central_frequency))**3 + \
+            (1/24) * FOD * (2*torch.pi * (frequency - central_frequency))**4
     
     return phase
 
@@ -92,8 +86,7 @@ def yb_gain(signal:torch.TensorType, intensity_yb:torch.TensorType, n_passes:int
     Returns: 
         torch.tensor: New spectrum, narrower because of the gain. 
     """
-    n_passes = torch.tensor(n_passes, dtype = torch.float64)
-    signal, intensity_yb, n_passes = iterable_to_cuda(input = [signal, intensity_yb, n_passes])
+    n_passes = torch.tensor(n_passes, dtype=torch.float32)
     
     return signal * (intensity_yb ** n_passes)
 
@@ -122,25 +115,36 @@ def temporal_profile(frequency:torch.TensorType, field:torch.TensorType, npoints
     Returns:
         Tuple[torch.tensor, torch.tensor]: Returns either (time, intensity) (with time measured in in seconds) or intensity only.
     """
-    # send iterable to cuda
-    frequency, field = iterable_to_cuda(input = [frequency, field])
-    # create the time array
-    step = torch.diff(frequency)[0]
-    Dt = 1 / step
-    time = torch.linspace(start = - Dt/2, end = Dt/2, steps = len(frequency) + npoints_pad)
     # centering the array in its peak - padding the signal extremities to increase resolution
-    field = torch.nn.functional.pad(input = field, pad = (npoints_pad//2, npoints_pad//2), mode = "constant", value = 0)
+    field = torch.nn.functional.pad(
+        input=field, 
+        pad=(npoints_pad//2, npoints_pad//2), 
+        mode="constant", 
+        value=0
+    )
     # going from frequency to time
     field_time = torch.fft.ifftshift(torch.fft.ifft(field))
     # obtaining intensity
-    intensity_time = torch.real(field_time * torch.conj(field_time)) # only for casting reasons
+    intensity_time = torch.abs(field_time) ** 2
+    
     # normalizing the resulting signal
-    intensity_time = intensity_time / intensity_time.max() # normalizing
+    intensity_time = intensity_time / intensity_time.max()
     
     # either returning time or not according to return_time
     if not return_time: 
         return intensity_time
-    else: 
+    
+    else:
+        # create the time array
+        step = torch.diff(frequency)[0]
+        Dt = 1 / step
+        time = torch.linspace(
+            start=- Dt/2, 
+            end=Dt/2, 
+            steps=len(frequency)+npoints_pad, 
+            device="cpu"
+        )
+        
         return time, intensity_time
 
 def FWHM(x:torch.TensorType, y:torch.TensorType, return_roots:bool=False)->Union[float, Tuple[float, float]]: 
@@ -155,7 +159,7 @@ def FWHM(x:torch.TensorType, y:torch.TensorType, return_roots:bool=False)->Union
         Union[float, Tuple[float, float]]: value, in seconds, of FWHM and, optionally, the roots of the half spline.
     """
     # casting to numpy
-    x, y = x.numpy(), y.numpy()
+    x, y = x.cpu().numpy(), y.cpu().numpy()
 
     half_signal = y - (y.max() / 2)
     half_spline = UnivariateSpline(x = x, y = half_signal, s = 0)
