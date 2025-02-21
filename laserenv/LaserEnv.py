@@ -178,7 +178,10 @@ class FROGLaserEnv(AbstractBaseLaser):
         central_window = extract_central_window(frog_trace, window_size=128)
         
         # normalize to [0, 255] as per the observation space requirements
-        return 255 * central_window.reshape(1, *central_window.shape)
+        return {
+            "frog_trace": 255 * central_window.reshape(1, *central_window.shape).astype(np.uint8),
+            "psi": self.psi.cpu().numpy()
+        }
 
     def _get_info(self, terminated:Optional[bool]=None, truncated:Optional[bool]=None, reward_components:Optional[dict]=None): 
         """Return state-related info."""
