@@ -30,14 +30,14 @@ def visualize_pulses(
     fig, ax = plt.subplots(dpi=200)
     # plotting
     ax.plot(
-        time.numpy(), 
-        actual_pulse.numpy(), 
+        time.cpu().numpy(), 
+        actual_pulse.cpu().numpy(), 
         lw = 2, 
         label = "Actual Pulse")
 
     ax.scatter(
-        time.numpy(), 
-        target_pulse.numpy(),
+        time.cpu().numpy(), 
+        target_pulse.cpu().numpy(),
         label = "Target Pulse", 
         c = "tab:grey",
         marker = "x", 
