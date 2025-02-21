@@ -2,6 +2,7 @@ from laserenv.utils.frogtrace import compute_frog_trace
 import matplotlib.pyplot as plt
 from laserenv.env_utils import EnvParametrization
 from laserenv.LaserEnv import FROGLaserEnv
+from laserenv.env_utils import extract_central_window
 
 # Use default environment parameters from EnvParametrization
 params = EnvParametrization()
@@ -21,6 +22,6 @@ frog_trace = compute_frog_trace(
 )
 
 fig, ax = plt.subplots()
-ax.imshow(frog_trace)
+ax.imshow(extract_central_window(frog_trace, window_size=env.window_size))
 plt.show()
 
