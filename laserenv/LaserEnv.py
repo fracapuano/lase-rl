@@ -49,6 +49,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         action_bounds:Tuple[float, List[float]]=0.1,
         init_variance:float=.1,
         device:str="cpu",
+        window_size:int=64,
         env_kwargs:dict={}
     ) -> None:
         # env parametrization init - chagepoint for different xi's.
@@ -62,13 +63,14 @@ class FROGLaserEnv(AbstractBaseLaser):
         )
         """Specifying observation space"""
         self.psi_dim = 3
-        
+        self.window_size = window_size
+
         # specifiying obs space, as Dict containing:
-        # - 128x128 B&W FROG traces (Box space)
+        # - (self.window_size x self.window_size) B&W FROG traces (Box space)
         # - current control parameters psi (Box space)
         self.observation_space = Dict({
             "frog_trace": Box(
-                low=0, high=255, shape=(1, 128, 128), dtype=np.uint8
+                low=0, high=255, shape=(1, self.window_size, self.window_size), dtype=np.uint8
             ),
             "psi": Box(
                 low=0.0, high=1.0, shape=(self.psi_dim,), dtype=np.float32
@@ -98,9 +100,6 @@ class FROGLaserEnv(AbstractBaseLaser):
         self.transform_limited = self.laser.transform_limited()
         # control utils - suite to handle with ease normalization of control params
         self.control_utils = ControlUtils()  # initialized with default parameters 
-
-        # reward coefficients
-        self.coeffs = env_kwargs.get("reward_coeffs", [1,1])
 
         # defining maximal number of steps and duration (ps) for the pulse
         self.MAX_DURATION=env_kwargs.get("max_duration", 20)
@@ -153,7 +152,8 @@ class FROGLaserEnv(AbstractBaseLaser):
     @property
     def frog(self):
         """Returns the FROG trace of the current control parameter."""
-        return self.laser.control_to_frog(self.psi_picoseconds)
+        # return self.laser.control_to_frog(self.psi_picoseconds)
+        return self.laser.control_to_frog((-1*self.laser.compressor_params * torch.tensor([1e24, 1e36, 1e48], dtype=torch.float64)).type(torch.float32))
     
     @property
     def pulse_FWHM(self):
@@ -185,7 +185,7 @@ class FROGLaserEnv(AbstractBaseLaser):
     def _get_obs(self): 
         """Return observation."""
         frog_trace = self.frog.cpu().numpy()  # Move to CPU only at the end
-        central_window = extract_central_window(frog_trace, window_size=128)
+        central_window = extract_central_window(frog_trace, window_size=self.window_size)
         
         return {
             "frog_trace": 255 * central_window.reshape(1, *central_window.shape).astype(np.uint8),
@@ -285,20 +285,14 @@ class FROGLaserEnv(AbstractBaseLaser):
             x = self.peak_intensity / self.TL_intensity # rewarding intensity itself
             intensity_reward = min((0.1 / (1-x)) - 0.1, 7)  # asymptotically rewarding higher intensities
         
-        # reward coefficients
-        coeff_healthy, coeff_intensity = self.coeffs
-
-        alive_component = 0.1 * coeff_healthy * healthy_reward
-        intensity_component = coeff_intensity*intensity_reward
-        duration_component = -0.1*self.pulse_FWHM
+        intensity_component = intensity_reward
+        duration_component = -0.05 * self.pulse_FWHM
         control_component = -np.linalg.norm(self._psi)**2
 
-        final_reward = alive_component + intensity_component + duration_component + control_component
+        final_reward = 1e-2*healthy_reward + intensity_component + duration_component # + alive_component + control_component
         components = {
-            "alive_component": alive_component * 10,
             "intensity_component": intensity_component,
-            "duration_component": duration_component * (-10),
-            "control_component": control_component * (-1)
+            "duration_component": duration_component,
         }
 
         return final_reward, components
@@ -331,7 +325,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         )
 
         if terminated:
-            reward -= 5  # penalty for terminating the episode
+            reward = -5  # penalty for terminating the episode
         
         return self._get_obs(), reward, terminated, truncated, info
     
@@ -415,7 +409,7 @@ class FROGLaserEnv(AbstractBaseLaser):
     
     def _render_frog(self)->np.array:
         """Renders FROG trace."""
-        fig, ax = visualize_frog(self.frog.cpu().numpy())
+        fig, ax = visualize_frog(self.frog.cpu().numpy(), window_size=self.window_size)
 
         fig.canvas.draw()
         X = np.array(fig.canvas.renderer.buffer_rgba())
