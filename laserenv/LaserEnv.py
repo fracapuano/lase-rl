@@ -152,8 +152,7 @@ class FROGLaserEnv(AbstractBaseLaser):
     @property
     def frog(self):
         """Returns the FROG trace of the current control parameter."""
-        # return self.laser.control_to_frog(self.psi_picoseconds)
-        return self.laser.control_to_frog((-1*self.laser.compressor_params * torch.tensor([1e24, 1e36, 1e48], dtype=torch.float64)).type(torch.float32))
+        return self.laser.control_to_frog(self.psi_picoseconds)
     
     @property
     def pulse_FWHM(self):
