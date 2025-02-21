@@ -22,7 +22,8 @@ control_upper_bound = torch.tensor((2.99624e-22, 9.55955e-35, 1.4323395e-49), dt
 
 def instantiate_laser(
         compressor_params:Iterable[float], 
-        B_integral:float
+        B_integral:float,
+        device: str="cpu"
         )->object: 
     """This function instantiates a Laser Model object based on a given parametrization (in terms 
     of B integral and compressor params).
@@ -48,6 +49,7 @@ def instantiate_laser(
         frequency = frequency * 1e-12, 
         field = field, 
         central_frequency=central_carrier,
+        device=device,
         # environment parametrization
         compressor_params = compressor_params,
         B=B_integral)
@@ -212,15 +214,15 @@ class ControlUtils:
         # ex: 0.9 -(descaled)-> 290 -(magnified)-> 2.9e-22 -(des) (fictional numbers)
         return self.control_magnify(self.descale_control(input_control))
 
-def extract_central_window(frog_trace: torch.Tensor, window_size: int = 512) -> torch.Tensor:
+def extract_central_window(frog_trace: np.ndarray, window_size: int = 512) -> np.ndarray:
     """Extract the central window of a FROG trace.
     
     Args:
-        frog_trace (torch.Tensor): The input FROG trace
+        frog_trace (np.ndarray): The input FROG trace
         window_size (int): Size of the square window to extract (default: 512)
         
     Returns:
-        torch.Tensor: Central window of the FROG trace with shape (window_size, window_size)
+        np.ndarray: Central window of the FROG trace with shape (window_size, window_size)
     """
     h, w = frog_trace.shape
     
