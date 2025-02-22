@@ -26,7 +26,13 @@ def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, sign
     if low_f >= up_f:  # consistency
         raise ValueError("frequency_cutoff must be a tuple of strictly increasing values.")
     
-    left_idx, right_idx = np.argwhere(frequency >= low_f)[0].item(), np.argwhere(frequency <= up_f)[-1].item()
+    # Find indices where frequency is within bounds
+    mask = (frequency >= low_f) & (frequency <= up_f)
+    if not np.any(mask):
+        raise ValueError(f"No frequency values found between {low_f} and {up_f}")
+    
+    left_idx = np.argmax(mask)  # First True value
+    right_idx = len(mask) - 1 - np.argmax(mask[::-1])  # Last True value
     return frequency[left_idx:right_idx+1], signal[left_idx:right_idx+1]
 
 def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5e3)) -> Tuple[np.array, np.array]: 
@@ -60,8 +66,7 @@ def extract_data(data_path:str=None)->Tuple[np.array, np.array]:
         data_path = str(get_project_root()) + "/data/L1_pump_spectrum.csv"
 
     # read the data
-    df = pd.read_csv(data_path, header = None)
-    df.columns = ["Wavelength (nm)", "Intensity"]
+    df = pd.read_csv(data_path, header=0)
     # converting Wavelength (nm) to Frequency (THz)
     df["Frequency (THz)"] = df["Wavelength (nm)"].apply(lambda wavelenght: 1e-12 * (c/(wavelenght * 1e-9)))
     # clipping everything that is negative - measurement error
@@ -70,8 +75,8 @@ def extract_data(data_path:str=None)->Tuple[np.array, np.array]:
     df = df.sort_values(by = "Frequency (THz)")
 
     frequency, intensity = df.loc[:, "Frequency (THz)"].values, df.loc[:, "Intensity"].values
-    # mapping intensity in the 0-1 range, as it is always done
-    intensity = intensity / intensity.max()
+    # mapping intensity in the 0-1 range
+    intensity /= intensity.max()
     field = np.sqrt(intensity)
     
     return frequency, field
