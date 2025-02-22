@@ -192,7 +192,7 @@ class ComputationalLaser:
         # spectrum amplified in time domain, to apply non linear phase to it
         y1tilde_time = torch.fft.ifft(y1tilde_frequency)
         # defining non-linear DIRA phase
-        intensity = torch.real(y1tilde_time * torch.conj(y1tilde_time))
+        intensity = torch.abs(y1tilde_time)**2
         phi_DIRA = (self.B / intensity.max()) * intensity
         # applying non-linear DIRA phase to the spectrum
         y2_time = physics.impose_phase(spectrum=y1tilde_time, phase=phi_DIRA)
