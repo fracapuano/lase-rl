@@ -120,9 +120,8 @@ def main():
     env = FROGLaserEnv(
         bounds=bounds,
         compressor_params=compressor_params,
-        B_integral=0,
-        render_mode="human",
-        device="mps"
+        B_integral=B_integral,
+        render_mode="human" if args.render else "rgb_array"
     )
 
     # Reset the environment to obtain the initial observation and info
