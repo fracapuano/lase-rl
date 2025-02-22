@@ -1,6 +1,6 @@
 import torch
 import matplotlib.pyplot as plt
-from typing import List
+from typing import List, Optional
 import numpy as np
 from collections import deque
 
@@ -9,7 +9,8 @@ from laserenv.env_utils import extract_central_window
 
 def visualize_pulses(
     pulse:List[torch.TensorType], 
-    target_pulse:List[torch.TensorType]
+    target_pulse:List[torch.TensorType],
+    stretcher_phase: Optional[torch.TensorType]=None,
 ):
     """This function visualizes two different pulses rolling up the two to peak-index
     
@@ -33,7 +34,7 @@ def visualize_pulses(
         time.cpu().numpy(), 
         actual_pulse.cpu().numpy(), 
         lw = 2, 
-        label = "Actual Pulse")
+        label = "Temporal Pulse")
 
     ax.scatter(
         time.cpu().numpy(), 
@@ -79,10 +80,14 @@ def visualize_controls(
 
 def visualize_frog(
     frog: torch.Tensor,
-    window_size: int=128
+    window_size: Optional[int]=None
 ):
     """Visualizes a FROG trace."""
-    central_window = extract_central_window(
+    if window_size is None:
+        central_window = frog
+    
+    else:
+        central_window = extract_central_window(
         frog, 
         window_size
     )
