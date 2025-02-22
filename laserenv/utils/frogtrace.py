@@ -91,8 +91,9 @@ def compute_frog_trace(
     GPU-accelerated FROG trace computation using PyTorch.
     """
     if trim_window is not None:
-        E_time = E_time[pad_width-trim_window:pad_width+2*trim_window]
-    
+        max_index = E_time.shape[0]//2  # comes from padding!
+        E_time = E_time[max_index-trim_window:max_index+trim_window]
+
     N = len(E_time)
     device = E_time.device
     
@@ -119,8 +120,8 @@ def compute_frog_trace(
     if compute_axes:
         # Create axes (can stay on CPU as they're only used for plotting)
         total_time = N * dt
-        delay_axis = torch.linspace(-total_time / 2, total_time / 2, N, device="cpu")
-        frequency_axis = fftshift(fftfreq(N, dt, device="cpu"))
+        delay_axis = torch.linspace(-total_time / 2, total_time / 2, N)
+        frequency_axis = fftshift(fftfreq(N, dt))
         
         return frog_intensity, delay_axis, frequency_axis
     else:
@@ -207,14 +208,20 @@ if __name__ == "__main__":
     #   0: wavelength (nm), 1: frequency (in THz),
     #   2: intensity (normalized to have unit area)
 
-    df = pd.read_csv("/Users/fracapuano/Documents/Subs/RLC25/lase-rl/laserenv/data/dira_spec.csv", header=None)
-
+    from pathlib import Path
+    df = pd.read_csv(
+        str(Path(__file__).parent.parent) + "/data/L1_pump_spectrum.csv",
+        header=0
+    )
     # Convert columns to NumPy arrays.
-    wavelength = np.array(df[0])
-    # Frequency in Hz (power spectrum are collected in THz, hence they need scaling)
-    freq = np.array(df[1]) * 1e12
+    wavelength = df["Wavelength (nm)"].values
+    intensity = df["Intensity"].values
+    if "Frequency (THz)" not in df.columns:
+        freq = c / (wavelength*1e-9)
+    else:
+        freq = df["Frequency (THz)"].values
+
     # Use the square root of intensity (as in the original code) for the amplitude.
-    intensity = np.array(df[2])
     amplitude = np.sqrt(np.abs(intensity))
 
     # Interpolate onto a uniform frequency grid.
@@ -228,7 +235,7 @@ if __name__ == "__main__":
     tod = 0
     fod = 0
 
-    # Generate the FROG trace.
+    # # Generate the FROG trace.
     frog, delay_axis, wavelength_axis = generate_frog_trace(
         freq_uniform, spectrum_uniform, gdd=gdd, tod=tod, fod=fod, pad_width=10_000
     )
