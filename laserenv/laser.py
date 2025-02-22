@@ -20,7 +20,7 @@ class ComputationalLaser:
                 frequency: torch.Tensor, 
                 field: torch.Tensor, 
                 compressor_params: Tuple[float, float, float],
-                num_points_padding: int = int(3e4), 
+                num_points_padding: int = int(1e5), 
                 B: float = 2, 
                 central_frequency: float = (c/(1030*1e-9)), 
                 cristal_frequency: Optional[torch.Tensor]=None, 
@@ -166,15 +166,15 @@ class ComputationalLaser:
             return intensity_time
         else: 
             return time, intensity_time
-        
-    def control_to_temporal(self, control:torch.TensorType)->Tuple[torch.tensor, torch.tensor]: 
+    
+    def pump_chain(self, control: torch.Tensor) -> torch.Tensor:
         """This function performs a forward pass in the model using control values stored in control.
 
         Args:
-            control (torch.Tensor): Control values to use in the forward pass. Must be dispersion coefficients, given in SI units 
+            control (torch.Tensor): Control values to use in the forward pass. Must be dispersion coefficients.
 
         Returns:
-            Tuple[torch.Tensor, torch.Tensor]: (Time scale, Temporal profile of intensity for the given control).
+            torch.Tensor: The output spectrum of the pump chain.
         """
         control = control.to(self.device)
         # control quantities regulate the phase
@@ -209,8 +209,24 @@ class ComputationalLaser:
             y2_frequency, 
             phase=phi_compressor.to(y2_frequency.device)
         )
+        return y3_frequency
+    
+    def control_to_temporal(self, control:torch.TensorType)->Tuple[torch.tensor, torch.tensor]: 
+        """This function performs a forward pass in the model using control values stored in control.
+
+        Args:
+            control (torch.Tensor): Control values to use in the forward pass. Must be dispersion coefficients, given in SI units 
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: (Time scale, Temporal profile of intensity for the given control).
+        """
+        y3_frequency = self.pump_chain(control=control)
         # return time scale and temporal profile of the (controlled) pulse
-        return physics.temporal_profile(frequency=self.frequency, field=y3_frequency, npoints_pad=self.pad_points)
+        return physics.temporal_profile(
+            frequency=self.frequency, 
+            field=y3_frequency, 
+            npoints_pad=self.pad_points
+        )
     
     @line_profiler.profile
     def control_to_frog(
@@ -229,50 +245,12 @@ class ComputationalLaser:
         Returns:
             torch.Tensor: The FROG trace of the pulse for the given control.
         """
-        control = control.type(torch.float16).to(self.device)
-        # control quantities regulate the phase
-        phi_stretcher = self.emit_phase(control=control)
-        # phase imposed on the input field
-        y1_frequency = physics.impose_phase(
-            spectrum=self.field.type(torch.float16).to(phi_stretcher.device), 
-            phase=phi_stretcher
-        )
-        # spectrum amplified by DIRA crystal gain
-        y1tilde_frequency = physics.yb_gain(
-            signal=y1_frequency, 
-            intensity_yb=self.yb_field.type(torch.float16).to(y1_frequency.device)
-        )
-        # spectrum amplified in time domain, to apply non linear phase to it
-        y1tilde_time = torch.fft.ifft(y1tilde_frequency)
-        # defining non-linear DIRA phase
-        intensity = torch.real(y1tilde_time * torch.conj(y1tilde_time))
-        phi_DIRA = (self.B / intensity.max()) * intensity
-        # applying non-linear DIRA phase to the spectrum
-        y2_time = physics.impose_phase(spectrum=y1tilde_time, phase=phi_DIRA)
-        # back to frequency domain
-        y2_frequency = torch.fft.fft(y2_time)
-        # defining phase imposed by compressor
-        phi_compressor = self.emit_phase(
-            control=(
-                self.compressor_params * torch.tensor([1e24, 1e36, 1e48], dtype=torch.float64)
-            ).type(torch.float16)
-        )
-        # imposing compressor phase on spectrum
-        y3_frequency = physics.impose_phase(
-            y2_frequency, 
-            phase=phi_compressor.to(y2_frequency.device)
-        )
-
-        y3_frequency = torch.nn.functional.pad(
-            input=y3_frequency, 
-            pad=(npoints_pad, npoints_pad), 
-            mode="constant", 
-            value=0
-        )
+        # compute the temporal profile of the pulse
+        _, y3_time = self.control_to_temporal(control=control)
         
         # compute the FROG trace
         frog_output = frogtrace.compute_frog_trace(
-            E_time=y3_frequency, 
+            E_time=y3_time, 
             dt=1/self.frequency[0],
             trim_window=trim_window,
             pad_width=npoints_pad,
