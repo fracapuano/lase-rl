@@ -54,7 +54,7 @@ def collect_reward_data(n_timesteps=100):
         
         # Store reward components
         for component_name, value in info.items():
-            if 'component' in component_name and 'alive' not in component_name:
+            if 'component' in component_name:
                 reward_history[component_name].append(value)
         total_rewards.append(reward)
         
@@ -138,7 +138,8 @@ def main():
         obs, reward, terminated, truncated, info = env.step(action)
         
         # Store the observation frame
-        frames.append(obs)
+        obs_or_frame = env.render() if not args.render else obs["frog_trace"]
+        frames.append(obs_or_frame)
 
         done = terminated or truncated
 
@@ -153,7 +154,9 @@ def main():
             episode_count += 1
             # Reset for next episode
             obs, info = env.reset()
-            frames = [obs]  # Initialize with first frame of new episode
+            obs_or_frame = env.render() if not args.render else obs["frog_trace"]
+            frames = [obs_or_frame]
+
 
     # Save the last episode if it's not done
     if frames and args.record_frames:
