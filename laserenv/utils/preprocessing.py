@@ -76,7 +76,7 @@ def extract_data(data_path:str=None)->Tuple[np.array, np.array]:
 
     frequency, intensity = df.loc[:, "Frequency (THz)"].values, df.loc[:, "Intensity"].values
     # mapping intensity in the 0-1 range
-    intensity /= intensity.max()
+    intensity = intensity / intensity.max()
     field = np.sqrt(intensity)
     
     return frequency, field
