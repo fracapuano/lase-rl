@@ -99,7 +99,7 @@ def main():
         tensorboard_log=f"{run_dir}/tensorboard",
         seed=args.seed,
         verbose=0,
-        device="mps"
+        device=device
     )
 
     # Setup the Wandb callback to log training progress, including gradient information.
