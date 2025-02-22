@@ -101,3 +101,26 @@ def visualize_frog(
     
     return fig, ax
 
+def visualize_reward(
+    reward_components: dict
+):
+    """Visualizes the reward components."""
+    fig, ax = plt.subplots(dpi=200)
+    reward_keys = [
+        "alive_t",
+        "x_t",
+        "duration_t",
+        "r_total"
+    ]
+    reward_values = list(reward_components.values())
+    
+    ax.bar(
+        reward_keys,
+        reward_values
+    )
+
+    ax.set_title("Reward Components", fontsize=12)
+    ax.set_ylabel("Reward Value", fontsize=12)
+    
+    return fig, ax
+
