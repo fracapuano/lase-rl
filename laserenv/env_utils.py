@@ -34,9 +34,9 @@ def instantiate_laser(
     frequency, field = extract_data()  # extracts the data about input spectrum from data folder
     cutoff = np.array((289.95, 291.91)) * 1e12  # defines cutoff frequencies
     # cutting off the signal
-    frequency_clean, field_clean = cutoff_signal(frequency_cutoff = cutoff, 
-                                                 frequency = frequency * 1e12,
-                                                 signal = field)
+    frequency_clean, field_clean = cutoff_signal(frequency_cutoff=cutoff, 
+                                                 frequency=frequency*1e12,
+                                                 signal=field)
     # augmenting the signal (using splines)
     frequency_clean_aug, field_clean_aug = equidistant_points(frequency = frequency_clean,
                                                               signal = field_clean)  # n_points defaults to 5e3
@@ -100,6 +100,18 @@ class EnvParametrization:
             self.bounds, 
             self.B_integral
         ]
+
+    def get_parametrization_dict(self)->dict: 
+        """Returns the env parametrization as a dictionary.
+        
+        Returns: 
+            dict: Dictionary containing the environment parametrization.
+        """
+        return dict(
+            compressor_params=self.compressor_params,
+            bounds=self.bounds,
+            B_integral=self.B_integral
+        )
 
 default_params = EnvParametrization()
 _, default_bounds, *_ = default_params.get_parametrization()
