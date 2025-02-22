@@ -256,7 +256,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             bool: True if pulse_FWHM is equal to or exceeds MAX_DURATION.
         """
         terminated = self.pulse_FWHM >= self.MAX_DURATION
-        return bool(terminated)
+        return bool(terminated) and False
 
     def is_truncated(self) -> bool:
         """
@@ -288,7 +288,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         duration_component = -0.05 * self.pulse_FWHM
         control_component = -np.linalg.norm(self._psi)**2
 
-        final_reward = 1e-2*healthy_reward + intensity_component + duration_component # + alive_component + control_component
+        final_reward = 1e-1*healthy_reward + 2*intensity_component + duration_component # + control_component
         components = {
             "intensity_component": intensity_component,
             "duration_component": duration_component,
@@ -339,7 +339,10 @@ class FROGLaserEnv(AbstractBaseLaser):
         target_time, target_pulse = self.transform_limited
         
         # using rendering functions to show off pulses
-        fig, ax = visualize_pulses([time, control_pulse], [target_time, target_pulse])
+        fig, ax = visualize_pulses(
+            [time, control_pulse], 
+            [target_time, target_pulse]
+        )
         
         # specializing the plots to showcase control trajectories
         title_string = f"Timestep {self.n_steps}/{self.MAX_STEPS}"
@@ -348,7 +351,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             ax.get_lines()[0].set_color("red")
         
         # text box displays info on current control and transform-limited regret
-        knobs = self.psi.tolist()
+        knobs = self.psi_picoseconds.tolist()
         control_info = 'GDD: {:2.2e}\n'.format(knobs[0])+\
                        'TOD: {:2.2e}\n'.format(knobs[1])+\
                        'FOD: {:2.2e}\n'.format(knobs[2])+\
