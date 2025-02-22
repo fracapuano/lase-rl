@@ -11,3 +11,5 @@ gymnasium[other]
 pygame
 tensorboard
 line_profiler
+torchvision
+moviepy==1.0.3
