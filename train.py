@@ -1,6 +1,5 @@
 import wandb
 from stable_baselines3 import SAC, PPO
-from wandb.integration.sb3 import WandbCallback
 
 from laserenv.LaserEnv import FROGLaserEnv
 from laserenv.env_utils import EnvParametrization
@@ -8,10 +7,14 @@ from laserenv.env_utils import EnvParametrization
 from stable_baselines3.common.vec_env import (
     DummyVecEnv,
     SubprocVecEnv,
-    VecVideoRecorder, 
-    VecFrameStack
+    VecVideoRecorder,
+    VecFrameStack,
 )
 from stable_baselines3.common.monitor import Monitor
+
+from stable_baselines3.common.callbacks import CallbackList, EveryNTimesteps
+from callbacks import FROGWhileTrainingCallback
+from wandb.integration.sb3 import WandbCallback
 
 import os
 import torch
@@ -30,15 +33,15 @@ def get_device(return_cpu:bool=False):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--algo", type=str, default="PPO", choices=["PPO", "SAC"],
+    parser.add_argument("--algo", type=str, default="SAC", choices=["PPO", "SAC"],
                       help="RL algorithm to use")
-    parser.add_argument("--timesteps", type=int, default=100_000,
+    parser.add_argument("--timesteps", type=int, default=50_000,
                       help="Total timesteps for training")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                       help="Learning rate")
     parser.add_argument("--seed", type=int, default=42,
                       help="Random seed")
-    parser.add_argument("--eval-every", type=int, default=10000,
+    parser.add_argument("--eval-every", type=int, default=5_000,
                       help="Evaluate and record video every N steps")
     return parser.parse_args()
 
@@ -83,12 +86,13 @@ def main():
 
     env = DummyVecEnv([make_env for _ in range(n_envs)])
     env = VecFrameStack(env, n_stack=5)
-    env = VecVideoRecorder(
-        env,
-        f"{run_dir}/videos",
-        record_video_trigger=lambda x: x % args.eval_every == 0,
-        video_length=20
-    )
+    
+    # env = VecVideoRecorder(
+    #     env,
+    #     f"{run_dir}/videos",
+    #     record_video_trigger=lambda x: x % args.eval_every == 0,
+    #     video_length=20
+    # )
 
     # Initialize the model with selected algorithm
     algo_class = PPO if args.algo == "PPO" else SAC
@@ -99,7 +103,7 @@ def main():
         tensorboard_log=f"{run_dir}/tensorboard",
         seed=args.seed,
         verbose=0,
-        device=device
+        device=device,
     )
 
     # Setup the Wandb callback to log training progress, including gradient information.
@@ -108,14 +112,30 @@ def main():
         verbose=2
     )
 
+    frog_callback = FROGWhileTrainingCallback(
+        env=env,
+        n_eval_episodes=10,
+        best_model_path=run_dir
+    )
+
+    frog_callback = EveryNTimesteps(
+        n_steps=args.eval_every, 
+        callback=frog_callback
+    )
+
+    callback = CallbackList([
+        wandb_callback,
+        frog_callback
+    ])
+
     # Begin training using total_timesteps specified in wandb config
     model.learn(
         total_timesteps=args.timesteps, 
-        callback=wandb_callback, 
+        callback=callback, 
         progress_bar=True
     )
 
-    # Save the trained model for later use
+    # Save the trained model and normalization statistics
     model.save(f"{run_dir}/model.zip")
 
     # Finish the wandb run
