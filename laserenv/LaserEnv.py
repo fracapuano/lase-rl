@@ -19,7 +19,8 @@ from laserenv.utils import physics
 from laserenv.utils.render import (
     visualize_pulses, 
     visualize_controls,
-    visualize_frog
+    visualize_frog,
+    visualize_reward
 )
 from laserenv.env_utils import extract_central_window
 
@@ -165,7 +166,11 @@ class FROGLaserEnv(AbstractBaseLaser):
         """Returns peak intensity of the controlled shape un-doing intensity normalization."""
         return physics.peak_intensity(pulse_intensity=self.pulse[-1])
     
-    def transform_limited_regret(self): 
+    def frog_trace(self, control_ps: torch.TensorType) -> torch.TensorType:
+        """Returns the FROG trace of the given control parameters. Mostly used for logging."""
+        return self.laser.control_to_frog(control_ps)
+
+    def transform_limited_regret(self):
         """Computes aligned-L1 loss between current pulse and transform limited"""
         # obtain the pulse shape corresponding to given set of control params
         time, control_shape = self.pulse
@@ -210,6 +215,8 @@ class FROGLaserEnv(AbstractBaseLaser):
         if reward_components is not None:
             info.update(reward_components)
         
+        self._info = info
+        
         return info
     
     def remap_action(self, action:np.ndarray)->np.ndarray:
@@ -240,6 +247,8 @@ class FROGLaserEnv(AbstractBaseLaser):
             torch.zeros(self.action_dim), 
             torch.ones(self.action_dim)
         )
+
+        self.get_reward()
 
         # Clear the buffer and add initial control
         self.controls_buffer.clear()
@@ -281,18 +290,24 @@ class FROGLaserEnv(AbstractBaseLaser):
         if self.INCREMENTAL: 
             intensity_reward = self.peak_intensity - self.current_intensity  # rewarding variations of intensity
         else: 
-            x = self.peak_intensity / self.TL_intensity # rewarding intensity itself
-            intensity_reward = min((0.1 / (1-x)) - 0.1, 7)  # asymptotically rewarding higher intensities
+            # asymptotically rewarding higher intensities vs TL's
+            x = self.peak_intensity / self.TL_intensity
+            intensity_reward = min(x+(1e-2 / (1-x)) - 0.1, 7)
         
+        alive_component = healthy_reward
         intensity_component = intensity_reward
-        duration_component = -0.05 * self.pulse_FWHM
-        control_component = -np.linalg.norm(self._psi)**2
+        duration_component = -1 * self.pulse_FWHM
 
-        final_reward = 1e-1*healthy_reward + 2*intensity_component + duration_component # + control_component
+        final_reward = (alive_component + duration_component) + intensity_component
+        final_reward *= 1e-1  # scaling down the reward
         components = {
+            "alive_component": alive_component,
             "intensity_component": intensity_component,
             "duration_component": duration_component,
+            "final_reward": final_reward
         }
+
+        self.reward_components = components
 
         return final_reward, components
 
@@ -425,13 +440,29 @@ class FROGLaserEnv(AbstractBaseLaser):
 
         return frog_rgb_array
     
+    def _render_reward(self)->np.array:
+        """Renders reward components."""
+        fig, ax = visualize_reward(self.reward_components)
+        
+        fig.canvas.draw()
+        X = np.array(fig.canvas.renderer.buffer_rgba())
+        img = Image.fromarray(X)
+        target_height = 240
+        aspect_ratio = img.size[0] / img.size[1]
+        target_width = int(target_height * aspect_ratio)
+        img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+        reward_rgb_array = np.array(img.convert('RGB'))
+        plt.close(fig)
+        return reward_rgb_array
+
     def _render_frame(self):
         """
         Renders one frame using Pygame or returns RGB arrays depending on render_mode.
         """
         # Get the visualization arrays - adjust transposition to match desired orientation
         pulse_rgb_array = np.transpose(self._render_pulse(), axes=(1, 0, 2))
-        controls_rgb_array = np.transpose(self._render_controls(), axes=(1, 0, 2))
+        # controls_rgb_array = np.transpose(self._render_controls(), axes=(1, 0, 2))
+        controls_rgb_array = np.transpose(self._render_reward(), axes=(1, 0, 2))
         frog_rgb_array = np.transpose(self._render_frog(), axes=(1, 0, 2))
 
         if self.render_mode == "rgb_array":
