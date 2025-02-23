@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     from pathlib import Path
     df = pd.read_csv(
-        str(Path(__file__).parent.parent) + "/data/L1_pump_spectrum.csv",
+        str(Path(__file__).parent.parent) + "/data/dira_spec.csv",
         header=0
     )
     # Convert columns to NumPy arrays.
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     if "Frequency (THz)" not in df.columns:
         freq = c / (wavelength*1e-9)
     else:
-        freq = df["Frequency (THz)"].values
+        freq = df["Frequency (THz)"].values * 1e12
 
     # Use the square root of intensity (as in the original code) for the amplitude.
     amplitude = np.sqrt(np.abs(intensity))
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(7, 7))
     plt.title("SHG FROG Trace")
     extent = [delay_axis[0], delay_axis[-1], wavelength_axis[0], wavelength_axis[-1]]
-    plt.imshow(frog, extent=extent, aspect='auto', origin='lower', cmap='viridis')
+    plt.imshow(frog.T, extent=extent, aspect='auto', origin='lower', cmap='viridis')
     plt.xlabel("Delay (ps)")
     plt.ylabel("Wavelength (nm)")
     plt.colorbar(label="Intensity (a.u.)")
