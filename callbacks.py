@@ -24,13 +24,15 @@ class StatsAggregator:
             self.stats["peak_intensity"].append(locals_dict["info"].get("current Peak Intensity (TW/m^2)"))
             self.stats["fwhm"].append(locals_dict["info"].get("current FWHM (ps)"))
             self.stats["tl_regret"].append(locals_dict["info"].get("TL-L1Loss"))
+            self.stats["x_t(perc)"].append(locals_dict["info"].get("x_t(perc)"))
     
     def flush(self):
         self.stats = {
             "controls": [],
             "peak_intensity": [],
             "fwhm": [],
-            "tl_regret": []
+            "tl_regret": [],
+            "x_t(perc)": []
         }
 
 class FROGWhileTrainingCallback(BaseCallback): 
@@ -116,9 +118,11 @@ class FROGWhileTrainingCallback(BaseCallback):
             "final_intensity_avg": np.mean(self.episode_stats.stats["peak_intensity"]),
             "final_fwhm_avg": np.mean(self.episode_stats.stats["fwhm"]),
             "final_tl_regret_avg": np.mean(self.episode_stats.stats["tl_regret"]),
+            "final_intensity_x_t": np.mean(self.episode_stats.stats["x_t(perc)"]),
             "final_intensity_std": np.std(self.episode_stats.stats["peak_intensity"]),
             "final_fwhm_std": np.std(self.episode_stats.stats["fwhm"]),
-            "final_tl_regret_std": np.std(self.episode_stats.stats["tl_regret"])
+            "final_tl_regret_std": np.std(self.episode_stats.stats["tl_regret"]),
+            "final_intensity_x_t_std": np.std(self.episode_stats.stats["x_t(perc)"]),
         })
         
         # checks if this model is better than current best. If so, update current best
