@@ -48,6 +48,7 @@ def parse_args():
 def main():
     args = parse_args()
     n_envs = 4
+    torch.set_num_threads(n_envs)
     device = get_device(return_cpu=False)
     
     run = wandb.init(
