@@ -103,6 +103,15 @@ class ComputationalLaser:
         """
         self.compressor_params = new_compressor_params
     
+    def overwrite_single_compressor_params(
+            self, 
+            index: int,
+            new_compressor_param: float
+        ) -> None:
+        """This function overwrites a single compressor parameter.
+        """
+        self.compressor_params[index] = new_compressor_param
+    
     def translate_control(self, control: torch.Tensor, verse: str = "to_gdd") -> torch.Tensor: 
         """This function translates the control quantities either from Dispersion coefficients (the d_i's) to GDD, TOD and FOD using a system of linear equations 
         defined for this very scope or the other way around, according to the string "verse".  
