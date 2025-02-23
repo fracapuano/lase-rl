@@ -73,7 +73,7 @@ class FROGWhileTrainingCallback(BaseCallback):
         max_steps = self.model.get_env().envs[0].unwrapped.MAX_STEPS
         frames = []
         
-        for _ in tqdm(range(max_steps)):
+        for _ in range(max_steps):
             action, _ = self.model.predict(obs, deterministic=True)
             obs, _, done, _ = self._envs.step(action)
             frame = self._envs.render()
