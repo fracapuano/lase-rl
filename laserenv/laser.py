@@ -20,7 +20,7 @@ class ComputationalLaser:
                 frequency: torch.Tensor, 
                 field: torch.Tensor, 
                 compressor_params: Tuple[float, float, float],
-                num_points_padding: int = int(1e5), 
+                num_points_padding: int = int(5e4), 
                 B: float = 2, 
                 central_frequency: float = (c/(1030*1e-9)), 
                 cristal_frequency: Optional[torch.Tensor]=None, 
