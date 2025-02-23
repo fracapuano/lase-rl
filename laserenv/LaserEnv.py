@@ -1,7 +1,6 @@
 import line_profiler
 
 import torch
-torch.set_num_threads(1)
 
 import numpy as np
 from typing import Tuple, List
@@ -208,6 +207,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             "current_control (picoseconds)": self.psi_picoseconds,
             "current FWHM (ps)": self.pulse_FWHM,
             "current Peak Intensity (TW/m^2)": self.peak_intensity * 1e-12,
+            "x_t(perc)": 100 * self.peak_intensity / self.TL_intensity,
             "TL-L1Loss": self.transform_limited_regret(),
             "FWHM-failure": terminated if terminated is not None else False,
             "Timesteps-failure": truncated if truncated is not None else False,
@@ -247,12 +247,13 @@ class FROGLaserEnv(AbstractBaseLaser):
             torch.zeros(self.action_dim), 
             torch.ones(self.action_dim)
         )
-
-        self.get_reward()
-
+        
         # Clear the buffer and add initial control
         self.controls_buffer.clear()
         self.controls_buffer.append(self.psi)
+        self.current_x = self.peak_intensity / self.TL_intensity
+
+        self.get_reward()
 
         return self._get_obs(), self._get_info()
 
@@ -265,7 +266,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             bool: True if pulse_FWHM is equal to or exceeds MAX_DURATION.
         """
         terminated = self.pulse_FWHM >= self.MAX_DURATION
-        return bool(terminated) and False
+        return bool(terminated)
 
     def is_truncated(self) -> bool:
         """
@@ -287,12 +288,15 @@ class FROGLaserEnv(AbstractBaseLaser):
             float: Value of reward. Sum of two different components. Namely: Alive Bonus and Intensity (either gain or pure value)
         """
         healthy_reward = 2  # small constant, reward for having not failed yet.
-        if self.INCREMENTAL: 
-            intensity_reward = self.peak_intensity - self.current_intensity  # rewarding variations of intensity
-        else: 
+        x = self.peak_intensity / self.TL_intensity
+
+        if self.INCREMENTAL:
+            # rewarding variations of intensity
+            intensity_reward = x - self.current_x
+        else:
             # asymptotically rewarding higher intensities vs TL's
-            x = self.peak_intensity / self.TL_intensity
-            intensity_reward = min(x+(1e-2 / (1-x)) - 0.1, 7)
+            a, x = 0.2, min(1, x)
+            intensity_reward = min(x+(a / (1-x)) - a, 7)
         
         alive_component = healthy_reward
         intensity_component = intensity_reward
@@ -300,6 +304,7 @@ class FROGLaserEnv(AbstractBaseLaser):
 
         final_reward = (alive_component + duration_component) + intensity_component
         final_reward *= 1e-1  # scaling down the reward
+
         components = {
             "alive_component": alive_component,
             "intensity_component": intensity_component,
@@ -518,7 +523,8 @@ class FROGLaserEnv(AbstractBaseLaser):
             self.clock.tick(self.metadata["render_fps"])
 
             # Return the same format as rgb_array mode for consistency
-            return np.transpose(pygame.surfarray.array3d(self.window), (1, 0, 2))
+            # return np.transpose(pygame.surfarray.array3d(self.window), (1, 0, 2))
+            return None
 
     def close(self):
         if getattr(self, "window", None) is not None:
