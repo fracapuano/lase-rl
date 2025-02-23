@@ -1,17 +1,18 @@
 import gymnasium as gym
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC
 import laserenv
 
 from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv
 
 def main():
     render = True
+    
     def make_env():
         env = gym.make("LaserEnv", render_mode="human" if render else "rgb_array")
         return env
     
     env = VecFrameStack(DummyVecEnv([make_env]), n_stack=5)
-    model = PPO.load("runs/misty-feather-58/model.zip")
+    model = SAC.load("runs/vivid-sponge-110/model.zip")
     
     # Evaluation loop
     average_reward = 0
