@@ -6,6 +6,7 @@ import os
 import matplotlib.pyplot as plt
 from collections import defaultdict
 import argparse
+import gymnasium as gym
 
 from laserenv.LaserEnv import FROGLaserEnv
 from laserenv.env_utils import EnvParametrization
@@ -112,20 +113,15 @@ def main():
     parser.add_argument('--render', action='store_true', help='Render the environment')
     args = parser.parse_args()
 
-    # Use default environment parameters from EnvParametrization
-    params = EnvParametrization()
-    compressor_params, bounds, B_integral = params.get_parametrization()
-
-    # Create the environment (without rendering)
-    env = FROGLaserEnv(
-        bounds=bounds,
-        compressor_params=compressor_params,
-        B_integral=B_integral,
+    # Create the environment using gym.make
+    env = gym.make(
+        "RandomLaserEnv",
         render_mode="human" if args.render else "rgb_array"
     )
 
     # Reset the environment to obtain the initial observation and info
     obs, info = env.reset()
+    print(obs)
     
     done = False
     start_time = time.time()
