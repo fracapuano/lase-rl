@@ -1,0 +1,44 @@
+# configs/default.yaml
+
+# Training params
+training:
+  eval_freq: 5000
+  eval_episodes: 10
+  test_episodes: 50
+  gradient_steps: -1
+  gamma: 0.99
+  lr: 0.0003
+  now: 4
+  test_env: null
+  rand_all_but: null
+  rand_only: null
+  stop_at_reward_threshold: null
+  debug: false
+  performance_lb: 0
+  performance_lb_percentile: 0
+
+# DORAEMON specific
+doraemon:
+  kl_ub: 1.0
+  min_dyn_samples: 100
+  max_dyn_samples: 1000
+  init_beta_param: 100.0
+  train_until_lb: false
+  hard_performance_constraint: false
+  robust_estimate: false
+  alpha_ci: 0.9
+
+# Logging
+logging:
+  wandb: disabled
+  project: "DORAEMON-dev"
+  verbose: 1
+  notes: null
+
+# Environment
+env:
+  stack_history: 5
+  dyn_in_obs: false
+  actor_state_only: false
+  actor_history_only: false
+  critic_dyn_only: false
