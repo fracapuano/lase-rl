@@ -15,13 +15,13 @@ env = FROGLaserEnv(
 )
 
 frog_trace = compute_frog_trace(
-    env.transform_limited[0],
-    env.laser.frequency,
+    env.transform_limited[-1],
+    (env.laser.frequency[1]-env.laser.frequency[0])**(-1),
     trim_window=1000,
     pad_width=10000
 )
 
 fig, ax = plt.subplots()
-ax.imshow(extract_central_window(frog_trace, window_size=env.window_size))
+ax.imshow(extract_central_window(frog_trace.T, window_size=2*env.window_size))
 plt.show()
 
