@@ -47,7 +47,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    n_envs = 1
+    n_envs = 4
     device = get_device(return_cpu=False)
     
     run = wandb.init(
@@ -86,13 +86,6 @@ def main():
 
     env = DummyVecEnv([make_env for _ in range(n_envs)])
     env = VecFrameStack(env, n_stack=5)
-    
-    # env = VecVideoRecorder(
-    #     env,
-    #     f"{run_dir}/videos",
-    #     record_video_trigger=lambda x: x % args.eval_every == 0,
-    #     video_length=20
-    # )
 
     # Initialize the model with selected algorithm
     algo_class = PPO if args.algo == "PPO" else SAC
