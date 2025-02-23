@@ -9,3 +9,10 @@ register(
     max_episode_steps=20,
     kwargs=default_dynamics
 )
+
+register(
+    id="RandomLaserEnv",
+    entry_point="laserenv.RandomLaserEnv:RandomFROGLaserEnv",
+    max_episode_steps=20,
+    kwargs=default_dynamics
+)
