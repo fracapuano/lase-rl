@@ -2,6 +2,7 @@ from typing import Iterable, List
 import pandas as pd
 import numpy as np
 import torch
+from typing import Tuple
 
 from laserenv.laser import ComputationalLaser
 from laserenv.utils.preprocessing import (
@@ -87,6 +88,14 @@ class EnvParametrization:
         )
         # non-linear phase accumulation parameter - estimate of real value
         self.B_integral = B_integral
+
+        self.parameter_bounds = {
+            "B": [1, 3.5],
+            # dispersion coefficients are given in ps^k for numerical stability
+            "GDD": [2.47, 2.87],
+            "TOD": [2.37, 2.39],
+            "FOD": [-9.55e-2, -9.53e-2]
+        }
     
     def get_parametrization(self)->List[torch.tensor]: 
         """Returns the env parametrization.
@@ -112,6 +121,23 @@ class EnvParametrization:
             bounds=self.bounds,
             B_integral=self.B_integral
         )
+
+    def get_bounds(self, parameters: List[str]) -> List[Tuple[float, float]]:
+        """Get the bounds for the specified parameters.
+
+        Args:
+            parameters (List[str]): List of parameter names to get bounds for.
+        
+        Returns:
+            List[Tuple[float, float]]: List of tuples containing the lower and upper bounds for the specified parameters.
+        """
+        lower, upper = [], []
+        for param in parameters:
+            lower.append(self.parameter_bounds[param][0])
+            upper.append(self.parameter_bounds[param][1])
+        
+        return lower, upper
+    
 
 default_params = EnvParametrization()
 _, default_bounds, *_ = default_params.get_parametrization()
