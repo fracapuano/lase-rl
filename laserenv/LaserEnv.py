@@ -367,19 +367,23 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         # text box displays info on current control and transform-limited regret
         knobs = self.psi_picoseconds.tolist()
-        control_info = 'GDD: {:2.2e}\n'.format(knobs[0])+\
-                       'TOD: {:2.2e}\n'.format(knobs[1])+\
-                       'FOD: {:2.2e}\n'.format(knobs[2])+\
+        compressor_params = self.laser.compressor_params.tolist()
+        control_info = 'GDD: {:2.2e}\n'.format(knobs[0], compressor_params[0])+\
+                       'TOD: {:2.2e}\n'.format(knobs[1], compressor_params[1])+\
+                       'FOD: {:2.2e}\n'.format(knobs[2], compressor_params[2])+\
                        'B-integral: {:.4f}'.format(self.laser.B)
         
-        energy_info = 'L1Loss: {:.4f}\n'.format(self.transform_limited_regret())+\
-                      'FWHM (ps): {:2.2f}\n'.format(self._get_info()["current FWHM (ps)"])+\
+        compressor_info = 'comp_GDD: {:2.2e}\n'.format(compressor_params[0])+\
+                          'comp_TOD: {:2.2e}\n'.format(compressor_params[1])+\
+                          'comp_FOD: {:2.2e}'.format(compressor_params[2])
+        
+        energy_info = 'FWHM (ps): {:2.2f}\n'.format(self._get_info()["current FWHM (ps)"])+\
                       'x: {:2.2f}'.format(100 * self._get_info()["current Peak Intensity (TW/m^2)"] / (self.TL_intensity * 1e-12))
         
         props = dict(boxstyle='round', facecolor='white', edgecolor='gray', alpha=0.5)
         ax.text(0.7, 0.95, control_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
         ax.text(0.025, 0.8, energy_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
-
+        ax.text(0.025, 0.7, compressor_info, transform=ax.transAxes, fontsize=10, verticalalignment='top', bbox=props)
         
         ax.legend(loc="upper left", fontsize=12)
         ax.set_title(title_string, fontsize=12)
