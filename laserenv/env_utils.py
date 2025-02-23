@@ -21,11 +21,11 @@ control_lower_bound = torch.tensor((2.3522e-22, -1.003635e-34, 4.774465e-50), dt
 control_upper_bound = torch.tensor((2.99624e-22, 9.55955e-35, 1.4323395e-49), dtype=torch.float64)
 
 def instantiate_laser(
-        compressor_params:Iterable[float], 
+        compressor_params:Iterable[float],
         B_integral:float,
         device: str="cpu"
-        )->object: 
-    """This function instantiates a Laser Model object based on a given parametrization (in terms 
+        )->object:
+    """This function instantiates a Laser Model object based on a given parametrization (in terms
     of B integral and compressor params).
 
     Returns:
@@ -34,7 +34,7 @@ def instantiate_laser(
     frequency, field = extract_data()  # extracts the data about input spectrum from data folder
     cutoff = np.array((289.95, 291.91)) * 1e12  # defines cutoff frequencies
     # cutting off the signal
-    frequency_clean, field_clean = cutoff_signal(frequency_cutoff=cutoff, 
+    frequency_clean, field_clean = cutoff_signal(frequency_cutoff=cutoff,
                                                  frequency=frequency*1e12,
                                                  signal=field)
     # augmenting the signal (using splines)
@@ -46,21 +46,24 @@ def instantiate_laser(
 
     laser = ComputationalLaser(
         # laser specific parameters
-        frequency = frequency * 1e-12, 
-        field = field, 
+        frequency = frequency * 1e-12,
+        field = field,
         central_frequency=central_carrier,
         device=device,
         # environment parametrization
         compressor_params = compressor_params,
         B=B_integral)
-    
+
     return laser
 
+def matteos_contribution():
+    if True:
+        pass
 
-class EnvParametrization: 
+class EnvParametrization:
     """Parametrizes the default L1 Pump Environment."""
     def __init__(
-            self, 
+            self,
             compressor_params:torch.TensorType=default_compressor_params,
             lb:torch.TensorType=control_lower_bound,
             ub:torch.TensorType=control_upper_bound,
@@ -72,39 +75,39 @@ class EnvParametrization:
         https://github.com/fracapuano/ELIopt/blob/main/notebooks/SemiPhysicalModel/SemiPhysicalModel_v2.ipynb.
 
         Args:
-            lb (torch.tensor, optional): Tensor representing the lower bound for the control parameters. 
+            lb (torch.tensor, optional): Tensor representing the lower bound for the control parameters.
                                          Defaults to control_lower_bound.
-            ub (torch.tensor, optional): Tensor representing the upper bound for the control parameters. 
+            ub (torch.tensor, optional): Tensor representing the upper bound for the control parameters.
                                          Defaults to control_upper_bound.
 
         """
         # env parametrization
         # alpha_GDD, alpha_TOD, alpha_FOD
         self.compressor_params = compressor_params
-        
+
         self.bounds = torch.vstack(
             (lb, ub)
         )
         # non-linear phase accumulation parameter - estimate of real value
         self.B_integral = B_integral
-    
-    def get_parametrization(self)->List[torch.tensor]: 
+
+    def get_parametrization(self)->List[torch.tensor]:
         """Returns the env parametrization.
-        
-        Returns: 
+
+        Returns:
             List[torch.tensor]: List of elements parametrizing the environment.
-                                Ordered as [compressor_params, bounds, B_integral] 
+                                Ordered as [compressor_params, bounds, B_integral]
         """
         return [
-            self.compressor_params, 
-            self.bounds, 
+            self.compressor_params,
+            self.bounds,
             self.B_integral
         ]
 
-    def get_parametrization_dict(self)->dict: 
+    def get_parametrization_dict(self)->dict:
         """Returns the env parametrization as a dictionary.
-        
-        Returns: 
+
+        Returns:
             dict: Dictionary containing the environment parametrization.
         """
         return dict(
@@ -117,54 +120,54 @@ default_params = EnvParametrization()
 _, default_bounds, *_ = default_params.get_parametrization()
 default_om = torch.tensor((1e-24, 1e-36, 1e-48), dtype=torch.float64)
 
-class ControlUtils: 
+class ControlUtils:
     def __init__(
-            self, 
-            om:torch.TensorType=default_om, 
-            bounds:torch.TensorType=default_bounds): 
+            self,
+            om:torch.TensorType=default_om,
+            bounds:torch.TensorType=default_bounds):
         """
-        Args: 
+        Args:
             om (torch.tensor, optional): Order of magnitude of control parameters.
                                          Defaults to default_om (that is, controls in SI units).
             bounds (torch.tensor, optional): Bounds for control parameters. Default to default_params.
                                              (that is, default compressor of L1 Pump)
-        
+
         """
         self.forward_om = om  # from non-SI units to SI units
         self.backward_om = 1 / om  # from SI units to non-SI units
 
         self.bounds = bounds * self.backward_om  # non SI units
-    
+
     def scale_control(
             self,
             action:torch.TensorType,
-        )->torch.TensorType: 
+        )->torch.TensorType:
         """
         This function scales the input control `action` into output action.
         Normalization is performed with min-max normalization using bounds.
-        
-        Args: 
-            action (torch.tensor): Action to be scaled using bounds. 
-        
-        Returns: 
+
+        Args:
+            action (torch.tensor): Action to be scaled using bounds.
+
+        Returns:
             torch.tensor: Scaled action. Now, in the 0-1 range.
         """
         lower, upper = self.bounds
-        return (action - lower) / (upper - lower) 
+        return (action - lower) / (upper - lower)
 
     def descale_control(
             self,
             action:torch.TensorType,
-        )->torch.TensorType: 
+        )->torch.TensorType:
         """
         This function descales the input control `action` into output action.
         Denormalization is performed inverting min-max normalization using bounds.
-        
-        Args: 
-            action (torch.tensor): Action to be de-scaled using bounds. Each element is the 0-1 range 
+
+        Args:
+            action (torch.tensor): Action to be de-scaled using bounds. Each element is the 0-1 range
                                    considered.
-        
-        Returns: 
+
+        Returns:
             torch.tensor: Descaled action. Now, in the original range.
         """
         lower, upper = self.bounds
@@ -172,16 +175,16 @@ class ControlUtils:
 
     def controls_demagnify(self, input_control:torch.TensorType)->torch.TensorType:
         """
-        This function applies a demagnification operation on input control. 
+        This function applies a demagnification operation on input control.
         Considering that each element is assumed to take values in a predefinite range, we can use
-        this knowledge to retrieve the root of the number rather root and its actual order of magnitude. 
-        
+        this knowledge to retrieve the root of the number rather root and its actual order of magnitude.
+
         This is done considering how largely small is the order or magnitude (om) of input control values.
-        
-        Args: 
+
+        Args:
             input_control (torch.tensor): Input control to the actual laser. Expressed in SI units.
-        
-        Returns: 
+
+        Returns:
             torch.tensor: Output control, demagnified.
         """
         # SI -> non-SI
@@ -189,24 +192,24 @@ class ControlUtils:
 
     def control_magnify(self, input_control:torch.TensorType)->torch.TensorType:
         """
-        This function applies a demagnification operation on input control. 
+        This function applies a demagnification operation on input control.
         Considering that each element is assumed to take values in a predefinite range, we can use
-        this knowledge to retrieve the root of the number rather root and its actual order of magnitude. 
-        
+        this knowledge to retrieve the root of the number rather root and its actual order of magnitude.
+
         This is done considering how largely small is the order or magnitude (om) of input control values.
-        
-        Args: 
+
+        Args:
             input_control (torch.tensor): Input control to the actual laser. Expressed in non-SI units.
-        
-        Returns: 
+
+        Returns:
             torch.tensor: Output control, demagnified.
         """
         # non-SI -> SI
         return input_control * self.forward_om
-    
+
     def demagnify_scale(self, input_control:torch.TensorType)->torch.TensorType:
         """
-        Combines magnification and 0-1 scalig of input control. 
+        Combines magnification and 0-1 scalig of input control.
         Arguments and returns are the same as before.
 
         The control returned by this function would NOT be the one forwarded in the Computational Laser
@@ -217,7 +220,7 @@ class ControlUtils:
 
     def remagnify_descale(self, input_control:torch.TensorType)->torch.TensorType:
         """
-        Combines demagnification and descalig of input control. 
+        Combines demagnification and descalig of input control.
         Arguments and returns are the same as before.
 
         The control returned by this function would be the one forwarded in the Computational Laser
@@ -228,25 +231,25 @@ class ControlUtils:
 
 def extract_central_window(frog_trace: np.ndarray, window_size: int = 512) -> np.ndarray:
     """Extract the central window of a FROG trace.
-    
+
     Args:
         frog_trace (np.ndarray): The input FROG trace
         window_size (int): Size of the square window to extract (default: 512)
-        
+
     Returns:
         np.ndarray: Central window of the FROG trace with shape (window_size, window_size)
     """
     h, w = frog_trace.shape
-    
+
     # Calculate the start indices for the central window
     start_h = h//2 - window_size//2
     start_w = w//2 - window_size//2
-    
+
     # Extract the window
     central_window = frog_trace[
         start_h:start_h + window_size,
         start_w:start_w + window_size
     ]
-    
+
     return central_window
 
