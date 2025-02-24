@@ -17,7 +17,9 @@ class ReturnTrackerWrapper(gym.Wrapper):
         self.expose_episode_stats = False
         
     def step(self, action):
-        next_state, reward, done, info = self.env.step(action)
+        next_state, reward, terminated, truncated, info = self.env.step(action)
+
+        done = terminated or truncated
 
         if self.expose_episode_stats:
             # Compute return over time
@@ -33,15 +35,15 @@ class ReturnTrackerWrapper(gym.Wrapper):
                 self.ready_to_update_buffer = False
 
 
-        return next_state, reward, done, info
+        return next_state, reward, terminated, truncated, info
 
-    def reset(self):
-        ob = self.env.reset()
-
+    def reset(self, seed=None, options=None):
+        obs, info = self.env.reset(seed=seed, options=options)
+        
         if self.expose_episode_stats:
             self.exposed_cum_reward = 0
             self.ready_to_update_buffer = True
-        return ob
+        return obs, info
 
     def _update_buffer(self, episode_return):
         self.buffer.append(episode_return)
