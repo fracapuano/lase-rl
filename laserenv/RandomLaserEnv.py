@@ -66,7 +66,12 @@ class RandomFROGLaserEnv(RandomBaseLaser):
             0: "B_integral",
             1: "compressor_GDD"
         }
+        self.success_metric = "peak_intensity_ratio"
         
+        # Recording the actual dynamics bounds
+        self.min_task = [1, 2.47]
+        self.max_task = [3.5, 2.87]
+
         """Specifying observation space"""
         self.psi_dim = 3
         self.window_size = window_size
@@ -349,6 +354,10 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         """
         healthy_reward = 2  # small constant, reward for having not failed yet.
         x = self.peak_intensity / self.TL_intensity
+
+        """This peak intensity ratio is used to assess whether the episode concluded successfully"""
+        if hasattr(self, "success_metric"):
+            setattr(self, self.success_metric, x)
 
         a, x = 0.2, min(1, x)
         intensity_reward = min(x+(a / (1-x)) - a, 7)
