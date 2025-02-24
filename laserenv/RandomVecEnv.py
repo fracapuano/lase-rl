@@ -28,6 +28,7 @@ class RandomDummyVecEnv(DummyVecEnv):
         super().__init__(env_fns)
         self.waiting = False
         self.closed = False
+        self.master_seed = None
 
     def set_task(self, tasks):
         assert tasks.ndim == 2 and tasks.shape[0] == self.num_envs
@@ -97,6 +98,34 @@ class RandomDummyVecEnv(DummyVecEnv):
     def _get_target_envs(self, indices):
         indices = self._get_indices(indices)
         return [self.envs[i] for i in indices]
+    
+    def seed(self, seed=None):
+        """Set the seed for all environments."""
+        if seed is None:
+            seed = np.random.randint(0, 2**32 - 1)
+        self.master_seed = seed
+        seeds = []
+        for idx in range(self.num_envs):
+            seeds.append(self.env_method('seed', seed + idx, indices=idx)[0])
+        return seeds
+
+    def reset(self):
+        """Reset all environments and seed them with incrementing seeds if master_seed is set."""
+        if self.master_seed is not None:
+            self.seed(self.master_seed)  # This will increment seeds for each env
+        
+        obs = []
+        for env_idx in range(self.num_envs):
+            o, info = self.envs[env_idx].reset()
+            obs.append(o)
+        
+
+        return OrderedDict(
+            [
+                (k, np.stack([o[k] for o in obs])) 
+                for k in obs[0].keys()
+            ]
+        )
 
 
 class RandomSubprocVecEnv(VecEnv):
