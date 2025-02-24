@@ -61,6 +61,12 @@ class RandomFROGLaserEnv(RandomBaseLaser):
             render_mode=render_mode, 
             device=device
         )
+
+        self.dyn_ind_to_name = {
+            0: "B_integral",
+            1: "compressor_GDD"
+        }
+        
         """Specifying observation space"""
         self.psi_dim = 3
         self.window_size = window_size
@@ -134,14 +140,6 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         
         # setting the simulator in empty state
         self.reset()
-
-    @property
-    def dyn_ind_to_name(self):
-        """Mapping from dynamics index to name"""
-        return {
-            0: "B_integral",
-            1: "compressor_GDD"
-        }
 
     def get_default_task(self):
         return np.array([2, 2.67])  # nominal values as per system specification
