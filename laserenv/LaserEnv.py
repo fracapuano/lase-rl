@@ -266,7 +266,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             bool: True if pulse_FWHM is equal to or exceeds MAX_DURATION.
         """
         terminated = self.pulse_FWHM >= self.MAX_DURATION
-        return bool(terminated)
+        return bool(terminated) and False
 
     def is_truncated(self) -> bool:
         """
