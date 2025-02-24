@@ -15,6 +15,7 @@ import gymnasium as gym
 import torch
 import wandb
 from stable_baselines3.common.env_util import make_vec_env
+from laserenv.RandomVecEnv import RandomDummyVecEnv as RandomVecEnv
 
 import laserenv
 from utils import (
@@ -117,6 +118,7 @@ def main():
         args.env, 
         n_envs=args.now, 
         seed=args.seed,
+        vec_env_cls=RandomVecEnv,
         wrapper_class=make_wrapped_environment, 
         wrapper_kwargs={'args': args, 'wrapper': 'doraemon'}, 
         env_kwargs=env_kwargs
@@ -127,6 +129,7 @@ def main():
         args.env,
         n_envs=args.now,
         seed=args.seed,
+        vec_env_cls=RandomVecEnv,
         wrapper_class=make_wrapped_environment,
         wrapper_kwargs={'args': args, 'wrapper': 'returnTracker'},
         env_kwargs=env_kwargs
@@ -158,7 +161,7 @@ def main():
     performance_lower_bound = args.performance_lb
     
     if args.stop_at_reward_threshold:
-        raise NotImplementedError('Not used for now.')
+        raise NotImplementedError('Not yet implemented!')
         performance_lb_margin = compute_abs_reward_threshold_margin(args.reward_threshold_perc_margin)
         print('Reward threshold margin:', performance_lb_margin)
     else:
@@ -217,7 +220,7 @@ def main():
 
 
     ### Free up some memory
-    del training_subrtn
+    del training_subroutine
     del doraemon
     del env
     gc.collect()
@@ -227,12 +230,16 @@ def main():
     test_env = make_vec_env(
         args.test_env, 
         n_envs=args.now, 
-        seed=args.seed, 
+        seed=args.seed,
+        vec_env_cls=RandomVecEnv,
         wrapper_class=make_wrapped_environment, 
         wrapper_kwargs={'args': args}, 
         env_kwargs=env_kwargs
     )
-    test_env.set_dr_distribution(dr_type='uniform', distr=[x for i in range(len(gt_task)) for x in (bounds_low[i], bounds_high[i])])
+    test_env.set_dr_distribution(
+        dr_type='uniform', 
+        distr=[x for i in range(len(gt_task)) for x in (bounds_low[i], bounds_high[i])]
+    )
     test_env.set_dr_training(True)
     policy = Policy(
         algo=args.algo, 
@@ -242,6 +249,7 @@ def main():
         actor_obs_mask=actor_obs_keys, 
         critic_obs_mask=critic_obs_keys
     )
+    
     policy.load_state_dict(last_policy)
 
     mean_reward, std_reward = policy.eval(n_eval_episodes=args.test_episodes)
@@ -253,7 +261,7 @@ def main():
 
     ### Compute joint 2D heatmap values
     del test_env
-    if args.compute_final_heatmap:
+    if args.compute_final_heatmap or True:
         print('\n--- Computing joint 2D heatmap values')
         compute_joint_2dheatmap_data(last_policy, run_path)
 
@@ -279,29 +287,49 @@ def compute_joint_2dheatmap_data(test_policy, run_path):
 
     save_dir = os.path.join(run_path, 'joint_avg_return_per_dyn')
     create_dirs(save_dir)
-    target_filename = os.path.join(save_dir, f'joint_return_per_dyns_{dyn_pair[0]}_{dyn_pair[1]}.npy')
+    target_filename = os.path.join(
+        save_dir, 
+        f'joint_return_per_dyns_{dyn_pair[0]}_{dyn_pair[1]}.npy'
+    )
 
     test_env = make_vec_env(
         args.test_env,
         n_envs=args.now,
         seed=args.seed,
+        vec_env_cls=RandomVecEnv,
         wrapper_class=make_wrapped_environment,
         wrapper_kwargs={'args': args},
         env_kwargs=args.env_kwargs
     )
 
     actor_obs_mask, critic_obs_mask = get_actor_critic_obs_keys(args)
-    policy = Policy(algo=args.algo, env=test_env, device=args.device, seed=args.seed, actor_obs_mask=actor_obs_mask, critic_obs_mask=critic_obs_mask)
+    policy = Policy(
+        algo=args.algo, 
+        env=test_env, 
+        device=args.device, 
+        seed=args.seed, 
+        actor_obs_mask=actor_obs_mask, 
+        critic_obs_mask=critic_obs_mask
+    )
+
     policy.load_state_dict(test_policy)
 
     n_points_per_task_dim = 50 if not args.debug else 5
     return_per_dyn = np.empty((n_points_per_task_dim, n_points_per_task_dim))
 
-    gt_task = gym.make(args.test_env, **env_kwargs).get_task()
+    gt_task = gym.make(args.test_env, **env_kwargs).get_wrapper_attr("get_task")()
     lower_bounds = None
-    test_bounds = gym.make(args.test_env, **env_kwargs).get_uniform_dr_by_percentage(percentage=args.dr_percentage,
-                                                                       nominal_values=gt_task,
-                                                                       lower_bounds=lower_bounds)
+    test_bounds = gym.make(
+        args.test_env, **env_kwargs
+        ).get_wrapper_attr(
+            "get_uniform_dr_by_percentage"
+        )(
+            **dict(
+                percentage=args.dr_percentage,
+                nominal_values=gt_task,
+                lower_bounds=lower_bounds
+            )
+        )
     
     bounds_low, bounds_high = test_bounds[::2], test_bounds[1::2]
 
@@ -329,57 +357,56 @@ def compute_joint_2dheatmap_data(test_policy, run_path):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    
-    # Core arguments
-    parser.add_argument('--config', type=str, default='configs/default.yaml',
-                      help='Path to config file with detailed settings')
-    parser.add_argument('--env', type=str, default='RandomLaserEnv',
-                      help='Training environment name')
-    parser.add_argument('--algo', default='sac', type=str,
-                      help='RL algorithm (ppo, sac)')
-    parser.add_argument('--seed', default=0, type=int,
-                      help='Random seed') 
-    parser.add_argument('--timesteps', '-t', default=1000, type=int,
-                      help='Total training timesteps')
-    parser.add_argument('--device', default='cpu', type=str,
-                      help='Training device (cpu, cuda, mps)')
+    parser.add_argument('--timesteps',      default=1000, type=int, help='Budget. Global training timesteps (will be spread out across all parallel envs)')
+    parser.add_argument('--env',            default="RandomLaserEnv", type=str, help='Train gym env')
+    parser.add_argument('--test_env',       default=None, type=str, help='Test gym env')
+    parser.add_argument('--group',          default=None, type=str, help='Wandb run group')
+    parser.add_argument('--algo',           default='sac', type=str, help='RL Algo (ppo, lstmppo, sac)')
+    parser.add_argument('--lr',             default=3e-4, type=float, help='Learning rate')
+    parser.add_argument('--gamma',          default=0.99, type=float, help='gamma discount factor')
+    parser.add_argument('--now',            default=2, type=int, help='Number of cpus for parallelization')
+    parser.add_argument('--stop_at_reward_threshold', default=False, action='store_true', help='Stop at reward threshold')
+    parser.add_argument('--reward_threshold_perc_margin', default=0., type=float, help='Percentage of (threshold - reward_for_random_policy) to use as margin.')
+    parser.add_argument('--eval_freq',      default=10000, type=int, help='Global timesteps frequency for training evaluations')
+    parser.add_argument('--eval_episodes',  default=10, type=int, help='# episodes for training evaluations')
+    parser.add_argument('--test_episodes',  default=10, type=int, help='# episodes for test evaluations')
+    parser.add_argument('--seed',           default=0, type=int, help='Random seed')
+    parser.add_argument('--device',         default='cpu', type=str, help='<cpu,cuda,mps>')
+    parser.add_argument('--notes',          default=None, type=str, help='Wandb notes')
+    parser.add_argument('--wandb',          default='online', type=str, help='Wandb mode. [online, offline, disabled]')
+    parser.add_argument('--verbose',        default=1, type=int, help='Verbose integer value')
+    parser.add_argument('--stack_history',  default=5, type=int, help='Stack a number of previous (obs, actions) into the current obs vector. If > 1, it allows for implicit online systId, hence adaptive behavior.')
+    parser.add_argument('--dr_percentage',  default=0.1, type=float, help='Percentage of ground truth values used to build the Uniform DR distribution. gt +- gt*percentage')
+    parser.add_argument('--rand_only',      default=None, type=int, nargs='+', help='Index of dynamics parameter to randomize, instead of randomizing all possible parameters.')
+    parser.add_argument('--rand_all_but',   default=None, type=int, help='Helper parameter that sets --rand_only [] to all indexes except for the one specified by --rand_all_but.')
+    parser.add_argument('--dyn_in_obs',     default=False, action='store_true', help='If True, concatenate the dynamics of the environment in the observation vector, for task-aware policies.')
+    parser.add_argument('--gradient_steps', default=-1, type=int, help='Number of gradient steps when policy is updated in sb3 using SAC. -1 means as many as --args.now')
+    parser.add_argument('--debug',          default=False, action='store_true', help='Debug flag. Used to speed up some steps when they are just being tested.')
+    parser.add_argument('--compute_final_heatmap', default=False, action='store_true', help='If set, compute 2D heatmap at the end of training and save results to file.')
 
-    # High-level DORAEMON params
-    parser.add_argument('--dr_percentage', default=0.1, type=float,
-                      help='Domain randomization percentage')
-    parser.add_argument('--n_iters', default=5, type=int, 
-                      help='Number of DORAEMON iterations')
+    # Params for asymmetric information
+    parser.add_argument('--actor_state_only',   default=False, action='store_true', help='History or dynamics are filtered out from the actor input')
+    parser.add_argument('--actor_history_only', default=False, action='store_true', help='Dynamics are filtered out from the actor input')
+    parser.add_argument('--critic_dyn_only',    default=False, action='store_true', help='History is filtered out from the critic input')
 
-    # Optional overrides
-    parser.add_argument('--override', nargs='*', 
-                      help='Override config parameters, format: key=value')
+    # DORAEMON params
+    parser.add_argument('--n_iters',         default=5, type=int, help='Minimum number of DORAEMON opt. iterations (could be more due to early stopping when threshold is reached, if stopAtRewardThreshold is set)')
+    parser.add_argument('--performance_lb',  default=0.65, type=float, help='Performance lower bound for DORAEMON opt. problem. env.reward_threshold is used if None')
+    parser.add_argument('--kl_ub',           default=1, type=float, help='KL upper bound for DORAEMON opt. problem')
+    parser.add_argument('--min_dyn_samples', default=100, type=int, help='Minimum number of dynamics samples for computing performance constraint')
+    parser.add_argument('--max_dyn_samples', default=1000, type=int, help='Maximum number of dynamics samples for computing performance constraint')
+    parser.add_argument('--train_until_lb',  default=True, action='store_true', help='Train on initial distribution until performance lower bound is reached')
+    parser.add_argument('--hard_performance_constraint', default=False, action='store_true', help='Performance constraint may not be violated. Update will be skipped if not performance threshold has been reached.')
+    parser.add_argument('--robust_estimate', default=False, action='store_true', help='Use lower_confidence_bound as performance constraint instead of the sample mean.')
+    parser.add_argument('--alpha_ci',        default=0.9, type=float, help='Confidence level for the lower_confidence_bound')
+    parser.add_argument('--performance_lb_percentile', default=None, type=float, help='Use Percentile as performance constraint, instead of the mean.')
+    parser.add_argument('--success_rate_condition',    default=0.5, type=float, help='Desired expected success rate value used as performance constraint')
+    parser.add_argument('--start_from_wide_uniform',   default=False, action='store_true', help='start with the wide max entropy uniform distribution, and leverage the inverted opt. problem to find an easy region to train on initially.')
+    parser.add_argument('--prior_constraint',          default=False, action='store_true', help='if true, constraint prior parameters density to be equal to uniform')
+    parser.add_argument('--force_success_with_returns', default=False, action='store_true', help='If set, force using returns as a success metric condition even if env.success_metric is defined. A proper corresponding performance_lb needs to be defined.')
+    parser.add_argument('--init_beta_param', default=100., type=float, help='Beta distribution initial value for parameters a and b.')
 
-    args = parser.parse_args()
-    
-    # Load and merge with config file
-    config = load_config(args.config)
-    # Flatten config by merging all top-level dictionaries
-    flat_config = {}
-    for group in config.values():
-        if isinstance(group, dict):
-            flat_config.update(group)
-    
-    cli_args = vars(args)
-    
-    # Override config with CLI args
-    for k, v in cli_args.items():
-        if v is not None:
-            flat_config[k] = v
-            
-    # Handle explicit overrides
-    if args.override:
-        for override in args.override:
-            key, value = override.split('=')
-            flat_config[key] = type_convert(value)
-    
-    # Convert dict back to namespace
-    namespace = argparse.Namespace(**flat_config)
-    return namespace
+    return parser.parse_args()
 
 args = parse_args()
 
@@ -389,3 +416,4 @@ args.env_kwargs = env_kwargs
 
 if __name__ == '__main__':
     main()
+
