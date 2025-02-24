@@ -176,7 +176,7 @@ class Policy:
         if disable_eval:
             eval_callback = None
 
-        self.model.learn(total_timesteps=timesteps, callback=eval_callback)
+        self.model.learn(total_timesteps=timesteps, callback=eval_callback, progress_bar=True)
 
         if return_best_model:
             # Find best model among last and best
