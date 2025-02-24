@@ -7,7 +7,6 @@ from laserenv.env_utils import EnvParametrization
 from stable_baselines3.common.vec_env import (
     DummyVecEnv,
     SubprocVecEnv,
-    VecVideoRecorder,
     VecFrameStack,
 )
 from stable_baselines3.common.monitor import Monitor
@@ -35,7 +34,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="SAC", choices=["PPO", "SAC"],
                       help="RL algorithm to use")
-    parser.add_argument("--timesteps", type=int, default=50_000,
+    parser.add_argument("--timesteps", type=int, default=100_000,
                       help="Total timesteps for training")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                       help="Learning rate")
