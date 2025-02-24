@@ -847,7 +847,7 @@ class DORAEMON():
         if self.train_until_performance_lb and not self.train_until_done:
             if performance_constraint_fn(x0_opt) < self.performance_lower_bound:
                 # Skip DORAEMON update
-                print(f'--- DORAEMON iter {self.current_iter} skipped as performance lower bound has not been reached yet. Mean reward {performance_constraint_fn(x0_opt)} < {self.performance_lower_bound}')
+                print(f'--- DORAEMON iter {self.current_iter} skipped as performance lower bound has not been reached yet. Current performance: {performance_constraint_fn(x0_opt)} < {self.performance_lower_bound}')
                 wandb.log({"update": -1, 'timestep': self.current_timestep})
                 self.dummy_doraemon_update()
                 return
