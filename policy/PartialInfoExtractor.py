@@ -19,8 +19,8 @@ TensorDict = Dict[str, th.Tensor]
 class PartialInfoExtractor(BaseFeaturesExtractor):
     def __init__(
         self,
-        observation_mask: List[str],
         observation_space: spaces.Dict,
+        observation_mask: List[str],
         cnn_output_dim: int = 256,
         normalized_image: bool = False,
     ) -> None:
