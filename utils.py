@@ -10,7 +10,9 @@ import pickle
 from dr.ReturnDynamicsTrackerWrapper import ReturnDynamicsTrackerWrapper
 from dr.ReturnTrackerWrapper import ReturnTrackerWrapper
 
-from gymnasium.wrappers import FrameStackObservation
+from gymnasium.wrappers import FrameStackObservation, TransformObservation
+from gymnasium.spaces import Box
+from copy import deepcopy
 
 
 def save_object(obj, save_dir, filename):
@@ -36,7 +38,21 @@ def make_wrapped_environment(env, args, wrapper=None):
     """
     if args.stack_history > 1:
         env = FrameStackObservation(env, stack_size=args.stack_history)
+        # Batching together stack and channels for images, or sb3's image check fails https://github.com/DLR-RM/stable-baselines3/issues/799
+        stacked_obs_space = deepcopy(env.observation_space)
+        image_shape = env.observation_space["frog_trace"].shape  # image[0] is the stack size after stacking
+
+        stacked_obs_space["frog_trace"] = Box(
+            low=0, high=255, shape=(image_shape[0]*image_shape[1], *image_shape[2:]), dtype=np.uint8
+        )
         
+        env = TransformObservation(
+             env,
+             func=lambda obs: {**obs, 'frog_trace': obs['frog_trace'].reshape(-1, *obs['frog_trace'].shape[2:])},
+             observation_space=stacked_obs_space
+        )
+
+
     if wrapper is not None:
         if wrapper == 'doraemon':
             env = ReturnDynamicsTrackerWrapper(env)

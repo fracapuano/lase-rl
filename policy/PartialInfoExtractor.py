@@ -33,7 +33,8 @@ class PartialInfoExtractor(BaseFeaturesExtractor):
         total_concat_size = 0
         for key, subspace in observation_space.spaces.items():
             if key in self.keys_to_keep:
-                if is_image_space(subspace, normalized_image=normalized_image):
+                # need the hardcode to handle stacked images, cfr. https://github.com/DLR-RM/stable-baselines3/issues/799
+                if key=="frog_trace" or is_image_space(subspace, normalized_image=normalized_image):
                     extractors[key] = NatureCNN(subspace, features_dim=cnn_output_dim, normalized_image=normalized_image)
                     total_concat_size += cnn_output_dim
                 else:

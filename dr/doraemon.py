@@ -780,7 +780,7 @@ class DORAEMON():
 
             if self.success_rate_condition is not None:
                 # Perf. constraint as expected success rate
-                perf_values = torch.tensor(values.detach() >= self.success_rate_condition, dtype=torch.float64)
+                perf_values = (values.detach() >= self.success_rate_condition).to(torch.float64)
             else:
                 # Perf. constraint as expected return
                 perf_values = values
