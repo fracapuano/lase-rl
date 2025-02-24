@@ -74,12 +74,24 @@ class TrainingSubRtn():
         """
         self.env.env_method('set_expose_episode_stats', **{'flag': True})
         self.reset_buffer()
-        self.env.set_dr_distribution(dr_type=domainRandDistribution.get_dr_type(), distr=domainRandDistribution.get())
-        self.env.set_dr_training(True)
+        self.env.env_method(
+            "set_dr_distribution",
+            **dict(
+                dr_type=domainRandDistribution.get_dr_type(), 
+                distr=domainRandDistribution.get()
+            )
+        )
+        self.env.env_method("set_dr_training", True)
 
         # Turn on DR on eval_env as well
-        self.eval_env.set_dr_distribution(dr_type=domainRandDistribution.get_dr_type(), distr=domainRandDistribution.get())
-        self.eval_env.set_dr_training(True)
+        self.eval_env.env_method(
+            "set_dr_distribution",
+            **dict(
+                dr_type=domainRandDistribution.get_dr_type(), 
+                distr=domainRandDistribution.get()
+            )
+        )
+        self.eval_env.env_method("set_dr_training", True)
 
         if self.agent is None or reset_agent:
             self.agent = Policy(algo=self.algo,
@@ -624,7 +636,7 @@ class DORAEMON():
         if len(succ_metrics) > 0 and not self.force_success_with_returns:
             values = torch.tensor(succ_metrics)
 
-        train_success_rate = torch.tensor(values >= self.task_solved_threshold, dtype=torch.float32).mean()
+        train_success_rate = (values >= self.task_solved_threshold).type(torch.float32).mean()
 
         wandb.log({"est_train_mean_reward": original_values.mean(), "timestep": self.current_timestep})
         wandb.log({"est_train_median_reward": np.median(original_values), "timestep": self.current_timestep})
@@ -728,7 +740,7 @@ class DORAEMON():
 
             if self.success_rate_condition is not None:
                 # Perf. constraint as expected success rate
-                perf_values = torch.tensor(values.detach() >= self.success_rate_condition, dtype=torch.float64)
+                perf_values = (values.detach() >= self.success_rate_condition).to(torch.float64)
             else:
                 # Perf. constraint as expected return
                 perf_values = values
