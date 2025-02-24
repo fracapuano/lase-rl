@@ -25,6 +25,7 @@ class RandomBaseLaser(RandomEnv):
                                           the higher the non-linearity introduced in the model.
             render_mode (str, optional): Render mode. Defaults to None.
         """
+        super().__init__()
         self.device = device
         self._bounds = bounds
         

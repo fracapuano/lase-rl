@@ -16,7 +16,7 @@ class RandomEnv(gym.Env):
     """
 
     def __init__(self):
-        gym.Env.__init__(self)
+        super().__init__()
 
         self.nominal_values = None
         self.sampling = None
@@ -142,7 +142,9 @@ class RandomEnv(gym.Env):
         self.distr = distr.copy()
         self.to_distr = []
         for i in range(len(self.distr)):
-            self.to_distr.append(Beta(torch.tensor(self.distr[i]['a'], dtype=torch.float32), torch.tensor(self.distr[i]['b'], dtype=torch.float32)))
+            a = torch.as_tensor(self.distr[i]['a'], dtype=torch.float32)
+            b = torch.as_tensor(self.distr[i]['b'], dtype=torch.float32)
+            self.to_distr.append(Beta(a, b))
 
     def set_task_search_bounds(self):
         """Sets the parameter search bounds based on how they are specified in get_search_bounds_mean"""
