@@ -22,7 +22,11 @@ class ReturnDynamicsTrackerWrapper(gym.Wrapper):
         self.curr_episode_dynamics = None
         self.ready_to_update_buffer = False
         self.expose_episode_stats = False
-        
+
+        """Certain environments may define a success metric different from return"""
+        if hasattr(self.env.unwrapped, "success_metric"):
+            self.success_metric = self.env.unwrapped.success_metric
+
     def step(self, action):
         next_state, reward, terminated, truncated, info = self.env.step(action)
 
@@ -37,9 +41,13 @@ class ReturnDynamicsTrackerWrapper(gym.Wrapper):
                     episode_return=self.cum_reward
                 )
 
-                # TODO: what is this success metric thing?
-                if hasattr(self.env, 'success_metric'):
-                    self._update_succ_metric_buffer(succ_metric=getattr(self.env, self.success_metric))
+                if hasattr(self, "success_metric"):
+                    self._update_succ_metric_buffer(
+                        succ_metric=getattr(
+                            self.env.unwrapped, 
+                            self.success_metric
+                        )
+                    )
 
                 self.cum_reward = 0
                 self.ready_to_update_buffer = False
