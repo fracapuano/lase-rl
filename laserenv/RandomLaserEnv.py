@@ -185,9 +185,13 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         return self._psi
     
     @psi.setter
-    def psi(self, value: torch.Tensor):
-        self._psi=value
-    
+    def psi(self, value):
+        """Sets control parameters ensuring they are in NumPy array format."""
+        if isinstance(value, torch.Tensor):
+            self._psi = value.type(torch.float32).detach().cpu().numpy()
+        else:
+            self._psi = value
+        
     @property
     def psi_picoseconds(self):
         """
@@ -195,8 +199,10 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         Expressing control parameters in picoseconds allows to express them in float32,
         allowing for MPS compatibility in acceleration.
         """
-        return self.control_utils.descale_control(self.psi).type(torch.float32)
-    
+        # Convert numpy array to tensor, process, and return as tensor
+        psi_tensor = torch.from_numpy(self._psi).to(self.device)
+        return self.control_utils.descale_control(psi_tensor).type(torch.float32)
+
     @property
     def pulse(self):
         """Returns the temporal profile of the pulse that derives from the current observation"""
@@ -251,13 +257,15 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         
         compressor_GDD = self.dispersion_coefficient_for_dynamics(index=0)
         
-        return {
+        obs = {
             "frog_trace": 255 * central_window.reshape(1, *central_window.shape).astype(np.uint8),
-            "psi": self.psi.cpu().numpy(),
-            "action": self.action.cpu().numpy(),
+            "psi": self.psi,
+            "action": self.action,
             "B_integral": np.array([self.laser.B], dtype=np.float32),
             "compressor_GDD": np.array([compressor_GDD], dtype=np.float32),
         }
+
+        return obs
 
     def _get_info(
             self, 
@@ -267,6 +275,7 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         ) -> dict:
         """Return state-related info."""
         info = {
+            "timesteps": self.n_steps,
             "current_control": self.psi,
             "current_control (picoseconds)": self.psi_picoseconds,
             "current FWHM (ps)": self.pulse_FWHM,
@@ -295,7 +304,7 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         normalized = (action + 1) / 2
         return self.action_lower_bound + normalized * self.action_range
 
-    def reset(self, seed:int=None, options=None)->Tuple[np.ndarray, dict]: 
+    def reset(self, seed:int=None, options=None) -> Tuple[np.ndarray, dict]:
         """Resets the environment to initial observations"""
         # Set the seed if provided
         if seed is not None:
@@ -305,18 +314,20 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         # number of steps
         self.n_steps = 0
         
-        # starting in a random state
-        self.psi = torch.clip(
-            self.rho_zero.sample(), 
+        # starting in a random state - sample from torch distribution but convert to numpy
+        sampled_tensor = self.rho_zero.sample()
+        clipped_tensor = torch.clip(
+            sampled_tensor, 
             torch.zeros(self.action_dim), 
             torch.ones(self.action_dim)
         )
+        self.psi = clipped_tensor.type(torch.float32).detach().cpu().numpy()  # Store as numpy
 
-        self.action = torch.zeros(self.action_dim)
+        self.action = torch.zeros(self.action_dim).cpu().numpy()
         
         # Clear the buffer and add initial control
         self.controls_buffer.clear()
-        self.controls_buffer.append(self.psi)
+        self.controls_buffer.append(self.psi.copy())
 
         self.get_reward()
 
@@ -388,15 +399,16 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         # increment number of steps
         self.n_steps += 1
         # overwriting currently stored action with incoming action
-        self.action = torch.from_numpy(action)
+        self.action = action
         # scaling the action to the actual range
+
         rescaled_action = self.remap_action(action=action)
-        
         # applying (rescaled) action, clipping between 0 and 1
-        self.psi = torch.clip(
-            self.psi + torch.from_numpy(rescaled_action), 
-            torch.zeros(self.action_dim), 
-            torch.ones(self.action_dim)
+        self.psi = np.clip(
+            self.psi + rescaled_action, 
+            np.zeros(self.action_dim), 
+            np.ones(self.action_dim),
+            dtype=np.float32
         )
         
         self.controls_buffer.append(self.psi)
