@@ -96,37 +96,32 @@ class ReturnDynamicsTrackerWrapper(gym.Wrapper):
         return obs, info
 
     def seed(self, seed=None):
-        if hasattr(self.env, 'seed'):
-            return self.env.seed(seed)
+        if hasattr(self.env.unwrapped, 'seed'):
+            return self.env.unwrapped.seed(seed)
         return seed
 
     def set_dr_distribution(self, *args, **kwargs):
         """Pass through set_dr_distribution to the underlying environment"""
-        if hasattr(self.env, 'set_dr_distribution'):
-            return self.env.set_dr_distribution(*args, **kwargs)
-        return None
+        if hasattr(self.env.unwrapped, 'set_dr_distribution'):
+            return self.env.unwrapped.set_dr_distribution(*args, **kwargs)
 
     def get_dr_distribution(self):
         """Pass through get_dr_distribution to the underlying environment"""
-        if hasattr(self.env, 'get_dr_distribution'):
-            return self.env.get_dr_distribution()
-        return None
+        if hasattr(self.env.unwrapped, 'get_dr_distribution'):
+            return self.env.unwrapped.get_dr_distribution()
 
     def set_dr_training(self, flag):
         """Pass through set_dr_training to the underlying environment"""
-        if hasattr(self.env, 'set_dr_training'):
-            return self.env.set_dr_training(flag)
-        return None
+        if hasattr(self.env.unwrapped, 'set_dr_training'):
+            return self.env.unwrapped.set_dr_training(flag)
 
     def get_dr_training(self):
         """Pass through get_dr_training to the underlying environment"""
-        if hasattr(self.env, 'get_dr_training'):
-            return self.env.get_dr_training()
-        return None
+        if hasattr(self.env.unwrapped, 'get_dr_training'):
+            return self.env.unwrapped.get_dr_training()
 
     def get_reward_threshold(self):
         """Pass through get_reward_threshold to the underlying environment"""
-        if hasattr(self.env, 'get_reward_threshold'):
-            return self.env.get_reward_threshold()
-        return None
+        if hasattr(self.env.unwrapped, 'get_reward_threshold'):
+            return self.env.unwrapped.get_reward_threshold()
 
