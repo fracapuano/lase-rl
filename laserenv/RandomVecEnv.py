@@ -119,7 +119,6 @@ class RandomDummyVecEnv(DummyVecEnv):
             o, info = self.envs[env_idx].reset()
             obs.append(o)
         
-
         return OrderedDict(
             [
                 (k, np.stack([o[k] for o in obs])) 
@@ -153,12 +152,12 @@ class RandomSubprocVecEnv(VecEnv):
     """
 
     def __init__(self, env_fns: List[Callable[[], gym.Env]], start_method: Optional[str] = None):
-        
-        raise NotImplementedError("RandomSubprocVecEnv is not yet implemented for LaserEnvs")
+        # raise NotImplementedError("RandomSubprocVecEnv is not yet implemented for LaserEnvs")
         
         self.waiting = False
         self.closed = False
         n_envs = len(env_fns)
+        self.master_seed = None
 
         if start_method is None:
             # Fork is not a thread safe method (see issue #217)
@@ -180,7 +179,7 @@ class RandomSubprocVecEnv(VecEnv):
 
         self.remotes[0].send(("get_spaces", None))
         observation_space, action_space = self.remotes[0].recv()
-        VecEnv.__init__(self, len(env_fns), observation_space, action_space)
+        super().__init__(len(env_fns), observation_space, action_space)
 
     def set_task(self, tasks):
         assert tasks.ndim == 2 and tasks.shape[0] == self.num_envs
@@ -238,22 +237,40 @@ class RandomSubprocVecEnv(VecEnv):
     def step_wait(self) -> VecEnvStepReturn:
         results = [remote.recv() for remote in self.remotes]
         self.waiting = False
-        obs, rews, dones, infos = zip(*results)
-        return _flatten_obs(obs, self.observation_space), np.stack(rews), np.stack(dones), infos
+        o_s, rews, terminated_s, truncated_s, infos = zip(*results)
+        
+        obs = OrderedDict(
+            [(k, np.stack([o[k] for o in o_s])) for k in o_s[0].keys()]
+        )
+        dones = np.logical_or(terminated_s, truncated_s)
+        return obs, np.stack(rews), np.stack(dones), infos
 
 
     def seed(self, seed: Optional[int] = None) -> List[Union[None, int]]:
+        """Set the seed for all environments."""
         if seed is None:
             seed = np.random.randint(0, 2**32 - 1)
+        self.master_seed = seed  # Store the master seed
+        seeds = []
         for idx, remote in enumerate(self.remotes):
             remote.send(("seed", seed + idx))
-        return [remote.recv() for remote in self.remotes]
+            seeds.append(remote.recv())
+        return seeds
 
     def reset(self) -> VecEnvObs:
+        """Reset all environments and reseed if master_seed is set."""
+        if self.master_seed is not None:
+            self.seed(self.master_seed)  # This will increment seeds for each env
+            
         for remote in self.remotes:
             remote.send(("reset", None))
-        obs = [remote.recv() for remote in self.remotes]
-        return _flatten_obs(obs, self.observation_space)
+        o_s, infos = zip(*[remote.recv() for remote in self.remotes])
+        
+        obs = OrderedDict(
+            [(k, np.stack([o[k] for o in o_s])) for k in o_s[0].keys()]
+        )
+        
+        return obs
 
 
     def close(self) -> None:
@@ -342,17 +359,23 @@ def _worker(
         try:
             cmd, data = remote.recv()
             if cmd == "step":
-                observation, reward, done, info = env.step(data)
+                observation, reward, terminated, truncated, info = env.step(data)
+                done = terminated or truncated
                 if done:
-                    # save final observation where user can get it, then reset
                     info["terminal_observation"] = observation
-                    observation = env.reset()
-                remote.send((observation, reward, done, info))
+                    observation, reset_info = env.reset()
+                    info.update(reset_info)  # Merge reset info into step info
+                remote.send((observation, reward, terminated, truncated, info))
             elif cmd == "seed":
-                remote.send(env.seed(data))
+                try:
+                    seed_result = env.seed(data)
+                    remote.send(seed_result if seed_result is not None else data)
+                except AttributeError:
+                    # If environment doesn't support seeding, return the input seed
+                    remote.send(data)
             elif cmd == "reset":
-                observation = env.reset()
-                remote.send(observation)
+                observation, info = env.reset()
+                remote.send((observation, info))
             elif cmd == "render":
                 remote.send(env.render(data))
             elif cmd == "close":
@@ -362,7 +385,7 @@ def _worker(
             elif cmd == "get_spaces":
                 remote.send((env.observation_space, env.action_space))
             elif cmd == "env_method":
-                method = getattr(env, data[0])
+                method = env.get_wrapper_attr(data[0])
                 remote.send(method(*data[1], **data[2]))
             elif cmd == "get_attr":
                 remote.send(getattr(env, data))
