@@ -15,7 +15,10 @@ import gymnasium as gym
 import torch
 import wandb
 from stable_baselines3.common.env_util import make_vec_env
-from laserenv.RandomVecEnv import RandomDummyVecEnv as RandomVecEnv
+from laserenv.RandomVecEnv import (
+    RandomDummyVecEnv,
+    RandomSubprocVecEnv
+)
 
 import laserenv
 from utils import (
@@ -118,7 +121,7 @@ def main():
         args.env, 
         n_envs=args.now, 
         seed=args.seed,
-        vec_env_cls=RandomVecEnv,
+        vec_env_cls=RandomSubprocVecEnv if args.multiprocessing else RandomDummyVecEnv,
         wrapper_class=make_wrapped_environment, 
         wrapper_kwargs={'args': args, 'wrapper': 'doraemon'}, 
         env_kwargs=env_kwargs
@@ -129,7 +132,7 @@ def main():
         args.env,
         n_envs=args.now,
         seed=args.seed,
-        vec_env_cls=RandomVecEnv,
+        vec_env_cls=RandomSubprocVecEnv if args.multiprocessing else RandomDummyVecEnv,
         wrapper_class=make_wrapped_environment,
         wrapper_kwargs={'args': args, 'wrapper': 'returnTracker'},
         env_kwargs=env_kwargs
@@ -231,7 +234,7 @@ def main():
         args.test_env, 
         n_envs=args.now, 
         seed=args.seed,
-        vec_env_cls=RandomVecEnv,
+        vec_env_cls=RandomSubprocVecEnv if args.multiprocessing else RandomDummyVecEnv,
         wrapper_class=make_wrapped_environment, 
         wrapper_kwargs={'args': args}, 
         env_kwargs=env_kwargs
@@ -296,7 +299,7 @@ def compute_joint_2dheatmap_data(test_policy, run_path):
         args.test_env,
         n_envs=args.now,
         seed=args.seed,
-        vec_env_cls=RandomVecEnv,
+        vec_env_cls=RandomSubprocVecEnv if args.multiprocessing else RandomDummyVecEnv,
         wrapper_class=make_wrapped_environment,
         wrapper_kwargs={'args': args},
         env_kwargs=args.env_kwargs
@@ -365,6 +368,7 @@ def parse_args():
     parser.add_argument('--lr',             default=3e-4, type=float, help='Learning rate')
     parser.add_argument('--gamma',          default=0.99, type=float, help='gamma discount factor')
     parser.add_argument('--now',            default=2, type=int, help='Number of cpus for parallelization')
+    parser.add_argument('--multiprocessing', default=False, action='store_true', help='Use multiprocessing for env parallelization')
     parser.add_argument('--stop_at_reward_threshold', default=False, action='store_true', help='Stop at reward threshold')
     parser.add_argument('--reward_threshold_perc_margin', default=0., type=float, help='Percentage of (threshold - reward_for_random_policy) to use as margin.')
     parser.add_argument('--eval_freq',      default=10000, type=int, help='Global timesteps frequency for training evaluations')
