@@ -59,7 +59,7 @@ class RandomFROGLaserEnv(RandomBaseLaser):
             B_integral=B_integral,
             bounds=bounds,
             render_mode=render_mode, 
-            device=device
+            device=device,
         )
 
         self.dyn_ind_to_name = {
@@ -69,8 +69,8 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         self.success_metric = "peak_intensity_ratio"
         
         # Recording the actual dynamics bounds
-        self.min_task = [1, 2.47]
-        self.max_task = [3.5, 2.87]
+        self.min_task = np.array([1, 2.47])
+        self.max_task = np.array([3.5, 2.87])
 
         """Specifying observation space"""
         self.psi_dim = 3
@@ -172,7 +172,7 @@ class RandomFROGLaserEnv(RandomBaseLaser):
     def set_task(self, *task):
         """Set dynamics parameters to <task>"""
         B_integral, GDD = task
-        self.laser.overwrite_B_integral(B_integral)        
+        self.laser.overwrite_B_integral(B_integral.item())        
 
         self.laser.overwrite_single_compressor_params(
             index=0,
@@ -310,7 +310,10 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         if seed is not None:
             np.random.seed(seed)
             torch.manual_seed(seed)
-        
+
+        if self.dr_training:
+            self.set_random_task()
+
         # number of steps
         self.n_steps = 0
         
