@@ -122,8 +122,8 @@ def temporal_profile(frequency:torch.TensorType, field:torch.TensorType, npoints
         mode="constant", 
         value=0
     )
-    # going from frequency to time
-    field_time = torch.fft.ifftshift(torch.fft.ifft(torch.fft.fftshift(field)))
+    # going from frequency to time, centering field peak in the middle
+    field_time = torch.fft.ifftshift(torch.fft.ifft(field))
     # obtaining intensity
     intensity_time = torch.abs(field_time) ** 2
     
