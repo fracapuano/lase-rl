@@ -181,17 +181,17 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         # move target and controlled pulse peak on peak
         pulse1, pulse2 = physics.peak_on_peak(
-            temporal_profile=[time.cpu(), control_shape.cpu()], 
-            other=[target_time.cpu(), target_shape.cpu()]
+            temporal_profile=[time, control_shape], 
+            other=[target_time, target_shape]
             )
         
         # compute sum(L1 loss)
-        return (pulse1[1] - pulse2[1]).abs().sum().item()
+        return np.abs(pulse1[1] - pulse2[1]).sum()
 
     @line_profiler.profile
     def _get_obs(self): 
         """Return observation."""
-        frog_trace = self.frog.cpu().numpy()  # Move to CPU only at the end
+        frog_trace = self.frog
         central_window = extract_central_window(frog_trace, window_size=self.window_size)
         
         return {

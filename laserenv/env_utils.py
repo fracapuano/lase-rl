@@ -5,6 +5,7 @@ import torch
 from typing import Tuple
 
 from laserenv.laser import ComputationalLaser
+from laserenv.laser_numpy import ComputationalLaserNumpy
 from laserenv.utils.preprocessing import (
     extract_data,
     cutoff_signal,
@@ -45,15 +46,23 @@ def instantiate_laser(
     central_carrier = central_frequency(frequency = frequency_clean_aug, signal = field_clean_aug)
     frequency, field = torch.from_numpy(frequency_clean_aug), torch.from_numpy(field_clean_aug)
 
-    laser = ComputationalLaser(
-        # laser specific parameters
-        frequency = frequency * 1e-12, 
-        field = field, 
+    # laser = ComputationalLaser(
+    #     # laser specific parameters
+    #     frequency = frequency * 1e-12, 
+    #     field = field, 
+    #     central_frequency=central_carrier,
+    #     device=device,
+    #     # environment parametrization
+    #     compressor_params = compressor_params,
+    #     B=B_integral)
+
+    laser = ComputationalLaserNumpy(
+        frequency = frequency.numpy() * 1e-12, 
+        field = field.numpy(), 
         central_frequency=central_carrier,
-        device=device,
-        # environment parametrization
         compressor_params = compressor_params,
-        B=B_integral)
+        B=B_integral
+    )
     
     return laser
 

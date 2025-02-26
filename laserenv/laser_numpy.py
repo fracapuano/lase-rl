@@ -257,13 +257,7 @@ class ComputationalLaserNumpy:
         )
         
         # spectrum amplified in time domain, to apply non linear phase to it
-        y1tilde_time = np.fft.ifftshift(
-            np.fft.ifft(
-                np.fft.fftshift(
-                    y1tilde_frequency
-                )
-            )
-        )
+        y1tilde_time = np.fft.ifft(y1tilde_frequency)
         
         # defining non-linear DIRA phase
         intensity = np.abs(y1tilde_time)**2
@@ -337,6 +331,9 @@ class ComputationalLaserNumpy:
         Returns:
             Tuple[np.ndarray, np.ndarray]: (Time scale, Temporal profile of intensity for the given control).
         """
+        if not isinstance(control, np.ndarray):
+            control = control.numpy()
+        
         y3_frequency = self.pump_chain(control=control)
         # return time scale and temporal profile of the (controlled) pulse
         return self.temporal_profile(
@@ -367,7 +364,6 @@ class ComputationalLaserNumpy:
         _, y3_time = self.control_to_temporal(control=control)
         
         # compute the FROG trace
-        from laserenv.utils import frogtrace
         frog_output = self.compute_frog_trace(
             E_time=y3_time, 
             dt=1/self.frequency[0],

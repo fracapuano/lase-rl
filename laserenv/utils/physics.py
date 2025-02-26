@@ -100,7 +100,10 @@ def impose_phase(spectrum:torch.TensorType, phase:torch.TensorType)->torch.Tenso
     Returns: 
         torch.tensor: New spectrum with modified phase
     """
-    return spectrum * torch.exp(1j * phase)
+    if isinstance(spectrum, torch.Tensor):
+        return spectrum * torch.exp(1j * phase)
+    else:
+        return spectrum * np.exp(1j * phase)
 
 def temporal_profile(frequency:torch.TensorType, field:torch.TensorType, npoints_pad:int=int(1e4), return_time:bool=True) -> Tuple[torch.tensor, torch.tensor]:
     """This function returns the temporal profile of a given signal represented in the frequency domain. Padding is added so as to have more points and increase FFT algorithm 
@@ -159,7 +162,8 @@ def FWHM(x:torch.TensorType, y:torch.TensorType, return_roots:bool=False)->Union
         Union[float, Tuple[float, float]]: value, in seconds, of FWHM and, optionally, the roots of the half spline.
     """
     # casting to numpy
-    x, y = x.cpu().numpy(), y.cpu().numpy()
+    if isinstance(x, torch.Tensor) or isinstance(y, torch.Tensor):
+        x, y = x.cpu().numpy(), y.cpu().numpy()
 
     half_signal = y - (y.max() / 2)
     half_spline = UnivariateSpline(x = x, y = half_signal, s = 0)
@@ -231,9 +235,13 @@ def peak_intensity(pulse_intensity:torch.TensorType, w0:float=12e-3, E:float=220
     Returns: 
         float: peak intensity value.
     """
-
-    # the integral of the intensity can be approximated from the area under the curve of the pulse.
-    I_integral = torch.trapz(y = pulse_intensity, dx = dt).item()
+    if isinstance(pulse_intensity, torch.Tensor):
+        # the integral of the intensity can be approximated from the area under the curve of the pulse.
+        I_integral = torch.trapz(y = pulse_intensity, dx = dt).item()
+    else:
+        # the integral of the intensity can be approximated from the area under the curve of the pulse.
+        I_integral = np.trapezoid(y = pulse_intensity, dx = dt)
+    
     return (2 * E) / (np.pi * (w0 ** 2) * I_integral)
 
 def central_frequency(frequency:np.array, signal:np.array) -> float: 
@@ -267,18 +275,18 @@ def peak_on_peak(temporal_profile:List[torch.TensorType], other:List[torch.Tenso
     time, actual_pulse = temporal_profile
     target_time, target_pulse = other
     
-    # retrieving index where time is 0 (not exactly 0, dependings on fft Dt value)
-    zero_pos = torch.argwhere(torch.abs(time) == torch.abs(time).min())[0].item()
+    # retrieving index where time is 0 (not exactly 0, depending on fft Dt value)
+    zero_pos = np.where(np.abs(time) == np.abs(time).min())[0][0]
     # retrieving peak of pulse
-    max_pos = torch.argmax(actual_pulse).item()
+    max_pos = np.argmax(actual_pulse)
     # retrieving peak of target pulse
-    target_max_pos = torch.argmax(target_pulse).item()
+    target_max_pos = np.argmax(target_pulse)
     # rolling the two pulses to make them centered in 0 - target pulse always peaks in 0
     centering_target = -(max_pos - target_max_pos) if max_pos - target_max_pos >= 0 else target_max_pos - max_pos
     # always centering the pulse on zero
-    rolled_pulse = torch.roll(
+    rolled_pulse = np.roll(
             actual_pulse, 
-            shifts = centering_target
+            shift=centering_target
             )
     
     return [[target_time, rolled_pulse], [target_time, target_pulse]]

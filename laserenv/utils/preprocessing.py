@@ -35,7 +35,7 @@ def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, sign
     right_idx = len(mask) - 1 - np.argmax(mask[::-1])  # Last True value
     return frequency[left_idx:right_idx+1], signal[left_idx:right_idx+1]
 
-def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(1e3)) -> Tuple[np.array, np.array]: 
+def equidistant_points(frequency:np.array, signal:np.array, num_points:int=int(5e3)) -> Tuple[np.array, np.array]: 
     """This function uses a spline to interpolate the input signal so as to be able to reproduce it for
     equidistant frequencies rather than for the actual sampled ones (which are not equidistant) This step is
     fundamental to be able to later on apply the FFT algorithm.
