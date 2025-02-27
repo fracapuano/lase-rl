@@ -44,7 +44,7 @@ def translate_control(central_frequency:float, control:torch.TensorType, verse:s
         if verse.lower() == "to_gdd": 
             d2, d3, d4 = control
             # solving the conversion system using forward substitution
-            GDD = d2 / A[1,1]; TOD = (d3 - A[2,1] * GDD)/(A[2,2]); FOD = (d4 - A[3,1] * GDD - A[3,2] * TOD)/(A[3,3])
+            GDD = d2 / A[0,0]; TOD = (d3 - A[1,0] * GDD)/(A[1,1]); FOD = (d4 - A[2,0] * GDD - A[2,1] * TOD)/(A[2,2])
             # grouping the tensors maintaing information on the gradient
             return torch.stack([GDD, TOD, FOD])
 
