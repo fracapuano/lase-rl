@@ -286,7 +286,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             #     self.control_utils.control_magnify(compressor_params_distr.sample())
             # )
 
-        print(self.laser.B)
+
         return self._get_obs(), self._get_info()
 
     def is_terminated(self) -> bool:
