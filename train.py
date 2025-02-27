@@ -34,7 +34,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--algo", type=str, default="SAC", choices=["PPO", "SAC"],
                       help="RL algorithm to use")
-    parser.add_argument("--timesteps", type=int, default=100_000,
+    parser.add_argument("--timesteps", type=int, default=200_000,
                       help="Total timesteps for training")
     parser.add_argument("--learning-rate", type=float, default=3e-4,
                       help="Learning rate")
@@ -42,6 +42,9 @@ def parse_args():
                       help="Random seed")
     parser.add_argument("--eval-every", type=int, default=5_000,
                       help="Evaluate and record video every N steps")
+    parser.add_argument("--udr", action="store_true", default=False,
+                      help="Use UDR")
+    
     return parser.parse_args()
 
 def main():
@@ -61,8 +64,11 @@ def main():
             "learning_rate": args.learning_rate,
             "seed": args.seed,
             "frame_stack": 5,
-            "n_envs": n_envs
+            "n_envs": n_envs,
+            "udr": args.udr
         },
+        mode="disabled",
+        notes="SAC aligned with AsymSac",
     )
     
     # Create run directory for all assets
@@ -78,7 +84,8 @@ def main():
             bounds=bounds,
             compressor_params=compressor_params,
             B_integral=B_integral,
-            device=device
+            device=device,
+            udr=args.udr
         )
 
         env = Monitor(env)

@@ -69,15 +69,22 @@ class FROGLaserEnv(AbstractBaseLaser):
         self.psi_dim = 3
         self.window_size = window_size
 
+        # actions are deltas on the control parameters, \delta \psi
+        self.action_dim = 3
+
         # specifiying obs space, as Dict containing:
         # - (self.window_size x self.window_size) B&W FROG traces (Box space)
         # - current control parameters psi (Box space)
+        # - action, to guide system identification (Box space)
         self.observation_space = Dict({
             "frog_trace": Box(
                 low=0, high=255, shape=(1, self.window_size, self.window_size), dtype=np.uint8
             ),
             "psi": Box(
                 low=0.0, high=1.0, shape=(self.psi_dim,), dtype=np.float32
+            ),
+            "action": Box(
+                low=-1.0, high=1.0, shape=(self.action_dim,), dtype=np.float32
             )
         })
 
@@ -90,8 +97,6 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         # action range
         self.action_range = self.action_upper_bound - self.action_lower_bound
-        # actions are deltas on the control parameters, \delta \psi
-        self.action_dim = 3
         
         # actions are defined as deltas, with bounded updates
         self.action_space = Box(
@@ -196,7 +201,8 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         return {
             "frog_trace": 255 * central_window.reshape(1, *central_window.shape).astype(np.uint8),
-            "psi": self.psi.cpu().numpy()
+            "psi": self.psi.cpu().numpy(),
+            "action": self.action
         }
 
     def _get_info(
@@ -257,6 +263,9 @@ class FROGLaserEnv(AbstractBaseLaser):
         self.controls_buffer.append(self.psi)
         self.current_x = self.peak_intensity / self.TL_intensity
 
+        # Initialize action with zeros
+        self.action = torch.zeros(self.action_dim).cpu().numpy()
+
         self.get_reward()
         """Quick and dirty way of doing easy UDR"""
         if self.udr:
@@ -277,6 +286,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             #     self.control_utils.control_magnify(compressor_params_distr.sample())
             # )
 
+        print(self.laser.B)
         return self._get_obs(), self._get_info()
 
     def is_terminated(self) -> bool:
@@ -327,6 +337,8 @@ class FROGLaserEnv(AbstractBaseLaser):
         final_reward = (alive_component + duration_component) + intensity_component
         final_reward *= 1e-1  # scaling down the reward
 
+        final_reward = intensity_component - 0.1
+
         components = {
             "alive_component": alive_component,
             "intensity_component": intensity_component,
@@ -345,6 +357,8 @@ class FROGLaserEnv(AbstractBaseLaser):
         """
         # increment number of steps
         self.n_steps += 1
+        # Store the current action
+        self.action = action
         # scaling the action to the actual range
         rescaled_action = self.remap_action(action=action)
         
