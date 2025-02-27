@@ -269,15 +269,15 @@ class FROGLaserEnv(AbstractBaseLaser):
         self.get_reward()
         """Quick and dirty way of doing easy UDR"""
         if self.udr:
-            B_distr = torch.distributions.uniform.Uniform(low=1.5, high=2.5)
-            compressor_scaled = self.control_utils.controls_demagnify(self.compressor_params)
+            B_distr = torch.distributions.uniform.Uniform(low=1, high=3.5)
+            # compressor_scaled = self.control_utils.controls_demagnify(self.compressor_params)
             
-            # gdd_delta, tod_delta, fod_delta = 20, 10, 10*1e-2
-            gdd_delta, tod_delta, fod_delta = 5, 1e-2, 1e-4
-            compressor_params_distr = torch.distributions.uniform.Uniform(
-                low=compressor_scaled - torch.tensor([gdd_delta, tod_delta, fod_delta]),
-                high=compressor_scaled + torch.tensor([gdd_delta, tod_delta, fod_delta])
-            )
+            # # gdd_delta, tod_delta, fod_delta = 20, 10, 10*1e-2
+            # gdd_delta, tod_delta, fod_delta = 5, 1e-2, 1e-4
+            # compressor_params_distr = torch.distributions.uniform.Uniform(
+            #     low=compressor_scaled - torch.tensor([gdd_delta, tod_delta, fod_delta]),
+            #     high=compressor_scaled + torch.tensor([gdd_delta, tod_delta, fod_delta])
+            # )
             # samples dynamics parameters
             self.laser.overwrite_B_integral(
                 B_distr.sample().type(torch.float16).item()
