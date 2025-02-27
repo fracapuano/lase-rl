@@ -67,7 +67,6 @@ def main():
             "n_envs": n_envs,
             "udr": args.udr
         },
-        mode="disabled",
         notes="SAC aligned with AsymSac",
     )
     
