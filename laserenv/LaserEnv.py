@@ -269,7 +269,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         self.get_reward()
         """Quick and dirty way of doing easy UDR"""
         if self.udr:
-            B_distr = torch.distributions.uniform.Uniform(low=1, high=3.5)
+            B_distr = torch.distributions.uniform.Uniform(low=1.5, high=2.5)
             # compressor_scaled = self.control_utils.controls_demagnify(self.compressor_params)
             
             # # gdd_delta, tod_delta, fod_delta = 20, 10, 10*1e-2
