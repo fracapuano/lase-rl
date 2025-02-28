@@ -67,7 +67,7 @@ def main():
             "n_envs": n_envs,
             "udr": args.udr
         },
-        notes="SAC aligned with AsymSac",
+        notes="miniSAC, uses only psi",
     )
     
     # Create run directory for all assets
