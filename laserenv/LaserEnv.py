@@ -77,15 +77,15 @@ class FROGLaserEnv(AbstractBaseLaser):
         # - current control parameters psi (Box space)
         # - action, to guide system identification (Box space)
         self.observation_space = Dict({
-            # "frog_trace": Box(
-            #     low=0, high=255, shape=(1, self.window_size, self.window_size), dtype=np.uint8
-            # ),
+            "frog_trace": Box(
+                low=0, high=255, shape=(1, self.window_size, self.window_size), dtype=np.uint8
+            ),
             "psi": Box(
                 low=0.0, high=1.0, shape=(self.psi_dim,), dtype=np.float32
             ),
-            # "action": Box(
-            #     low=-1.0, high=1.0, shape=(self.action_dim,), dtype=np.float32
-            # )
+            "action": Box(
+                low=-1.0, high=1.0, shape=(self.action_dim,), dtype=np.float32
+            )
         })
 
         """Parsing action-dependant parameters"""
