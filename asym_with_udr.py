@@ -48,7 +48,6 @@ run = wandb.init(
         "algorithm": "sac",
         "timesteps": timesteps,
         "learning_rate": 3e-4,
-        "seed": 42,
         "frame_stack": 5,
         "n_envs": 4,
         "udr": True
@@ -62,20 +61,19 @@ wandb_callback = WandbCallback(
     verbose=2
 )
 
-frog_callback = FROGWhileTrainingCallback(
-    env=env,
-    n_eval_episodes=10,
-    best_model_path="./"
-)
+# frog_callback = FROGWhileTrainingCallback(
+#     env=env,
+#     n_eval_episodes=10,
+#     best_model_path="./"
+# )
 
-frog_callback = EveryNTimesteps(
-    n_steps=5000,
-    callback=frog_callback
-)
+# frog_callback = EveryNTimesteps(
+#     n_steps=5000,
+#     callback=frog_callback
+# )
 
 callback = CallbackList([
     wandb_callback,
-    frog_callback
 ])
 
 # Begin training using total_timesteps specified in wandb config
@@ -84,5 +82,7 @@ model.learn(
     callback=callback, 
     progress_bar=True
 )
+
+model.save("asym_with_udr.zip")
 
 wandb.finish()
