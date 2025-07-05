@@ -24,7 +24,7 @@ from laserenv.utils.render import (
 )
 from laserenv.env_utils import extract_central_window
 try:
-    import pygame  # Optional: only needed for human rendering.
+    import pygame  # type: ignore  # Optional: only needed for human rendering.
 except ImportError:
     pygame = None
 
