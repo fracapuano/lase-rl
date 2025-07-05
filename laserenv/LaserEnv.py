@@ -89,7 +89,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         """Parsing action-dependant parameters"""
         # Accept bounds either as a single float (symmetric range) or an iterable (explicit lower/upper)
         if isinstance(action_bounds, (list, tuple)):
-            self.action_lower_bound, self.action_upper_bound = action_bounds
+            self.action_lower_bound, self.action_upper_bound = float(action_bounds[0]), float(action_bounds[1])
         else:
             self.action_lower_bound, self.action_upper_bound = -float(action_bounds), float(action_bounds)
         
