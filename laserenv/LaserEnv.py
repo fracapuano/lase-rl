@@ -3,7 +3,7 @@ import line_profiler
 import torch
 
 import numpy as np
-from typing import Tuple, List
+from typing import Tuple, List, Sequence, Union
 from collections import deque
 from gymnasium.spaces import Box, Dict
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -51,7 +51,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         compressor_params:torch.TensorType,
         B_integral:float,
         render_mode:str="rgb_array",
-        action_bounds:Tuple[float, List[float]]=0.1,
+        action_bounds: Union[float, Sequence[float]] = 0.1,
         init_variance:float=.1,
         device:str="cpu",
         window_size:int=64,

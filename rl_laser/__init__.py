@@ -22,8 +22,8 @@ def _lazy_env_import():
     # Only execute at first call – subsequent calls are no-ops
     if "LaserEnv-v0" in registry and "RandomLaserEnv-v0" in registry:
         return
-    # Import implementation package (pulls in torch, numpy, etc.)
-    import_module("laserenv")
+    # Import the relocated core implementation (kept under rl_laser.laserenv)
+    import_module("rl_laser.laserenv")
 
     # After import, laserenv.__init__ has already registered base ids (if any).
     # Re-register with explicit versioned names for clarity.
@@ -31,12 +31,12 @@ def _lazy_env_import():
     # with the same callable.
     register(
         id="LaserEnv-v0",
-        entry_point="laserenv.LaserEnv:FROGLaserEnv",
+        entry_point="rl_laser.laserenv.LaserEnv:FROGLaserEnv",
         max_episode_steps=20,
     )
     register(
         id="RandomLaserEnv-v0",
-        entry_point="laserenv.RandomLaserEnv:RandomFROGLaserEnv",
+        entry_point="rl_laser.laserenv.RandomLaserEnv:RandomFROGLaserEnv",
         max_episode_steps=20,
     )
 
@@ -56,4 +56,8 @@ def make(id: str = "LaserEnv-v0", **kwargs):
 
     return gym.make(id, **kwargs)
 
-__all__ = ["make"]
+__all__ = ["make", "FROGLaserEnv", "RandomFROGLaserEnv"]
+
+# Re-export main classes for convenience
+from rl_laser.laserenv.LaserEnv import FROGLaserEnv  # type: ignore
+from rl_laser.laserenv.RandomLaserEnv import RandomFROGLaserEnv  # type: ignore
