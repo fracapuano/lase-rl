@@ -29,22 +29,6 @@ except ModuleNotFoundError:
 
 # ---------------------------------------------------------------------------------
 
-from typing import TYPE_CHECKING
-
-from rl_laser.core.laserenv.BaseLaser import AbstractBaseLaser  # type: ignore
-from rl_laser.core.laserenv.env_utils import ControlUtils  # type: ignore
-from rl_laser.core.laserenv.utils import physics  # type: ignore
-from rl_laser.core.laserenv.utils.render import (  # type: ignore
-    visualize_pulses, 
-    visualize_controls,
-    visualize_frog,
-    visualize_reward
-)
-from rl_laser.core.laserenv.env_utils import extract_central_window  # type: ignore
-
-# this way, figures are not automatically shown
-plt.ioff()
-
 # type checking imports and aliases
 if TYPE_CHECKING:
     import numpy.typing as npt
@@ -173,7 +157,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         return self._psi
     
     @psi.setter
-    def psi(self, value: torch.Tensor):
+    def psi(self, value: Tensor):
         self._psi=value
     
     @property
