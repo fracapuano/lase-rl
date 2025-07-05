@@ -11,7 +11,7 @@ np = opt("numpy", "base")
 torch = opt("torch", "torch")
 gymnasium = opt("gymnasium", "base")
 
-# only pull objects we need from gym
+# only pull objects we need from gym at runtime
 Box = gymnasium.spaces.Box  # type: ignore[attr-defined]
 DictSpace = gymnasium.spaces.Dict  # type: ignore[attr-defined]
 
@@ -29,11 +29,8 @@ except ModuleNotFoundError:
 
 # ---------------------------------------------------------------------------------
 
-from typing import Tuple, List, Sequence, Union, Optional, Dict, Any, TYPE_CHECKING
-from gymnasium.spaces import Box, Dict
-from torch.distributions.multivariate_normal import MultivariateNormal
-import matplotlib.pyplot as plt
-from PIL import Image
+from typing import TYPE_CHECKING
+
 from rl_laser.core.laserenv.BaseLaser import AbstractBaseLaser  # type: ignore
 from rl_laser.core.laserenv.env_utils import ControlUtils  # type: ignore
 from rl_laser.core.laserenv.utils import physics  # type: ignore
@@ -64,8 +61,8 @@ class FROGLaserEnv(AbstractBaseLaser):
     """
     def __init__(
         self,
-        bounds:torch.TensorType,
-        compressor_params:torch.TensorType,
+        bounds: Tensor,
+        compressor_params: Tensor,
         B_integral:float,
         render_mode:str="rgb_array",
         action_bounds: Union[float, Sequence[float]] = 0.1,
@@ -209,7 +206,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         """Returns peak intensity of the controlled shape un-doing intensity normalization."""
         return physics.peak_intensity(pulse_intensity=self.pulse[-1])
     
-    def frog_trace(self, control_ps: torch.Tensor) -> "torch.Tensor":
+    def frog_trace(self, control_ps: Tensor) -> Tensor:
         """Returns the FROG trace of the given control parameters. Mostly used for logging."""
         return self.laser.control_to_frog(control_ps)
 
@@ -388,7 +385,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         return final_reward, components
 
     @line_profiler.profile
-    def step(self, action:torch.TensorType)->Tuple[np.ndarray, float, bool, bool, dict]:
+    def step(self, action: np.ndarray) -> Tuple[Dict[str, Any], float, bool, bool, Dict[str, Any]]:
         """
         Applies given action on laser env. Returns observation, reward, terminated, truncated, info
         """
