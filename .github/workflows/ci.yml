@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, speedup]
+  pull_request:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.10"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
+      - name: Run basic import test
+        run: |
+          python - <<'PY'
+          import gymnasium
+          import rl_laser
+          env = gymnasium.make("LaserEnv-v0")
+          obs, info = env.reset()
+          print("Reset ok, obs keys:", obs.keys())
+          PY
+  publish:
+    if: github.event_name == 'release' && startsWith(github.event.release.tag_name, 'v')
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Build package
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}

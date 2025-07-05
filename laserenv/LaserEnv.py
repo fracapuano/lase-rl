@@ -94,7 +94,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             self.action_lower_bound, self.action_upper_bound = -float(action_bounds), float(action_bounds)
         
         # action range
-        self.action_range = self.action_upper_bound - self.action_lower_bound
+        self.action_range = float(self.action_upper_bound) - float(self.action_lower_bound)
         # actions are deltas on the control parameters, \delta \psi
         self.action_dim = 3
         
