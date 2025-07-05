@@ -13,16 +13,16 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 import matplotlib.pyplot as plt
 from PIL import Image
 from typing import Optional
-from laserenv.BaseLaser import AbstractBaseLaser
-from laserenv.env_utils import ControlUtils
-from laserenv.utils import physics
-from laserenv.utils.render import (
+from rl_laser.core.BaseLaser import AbstractBaseLaser  # type: ignore
+from rl_laser.core.env_utils import ControlUtils  # type: ignore
+from rl_laser.core.utils import physics  # type: ignore
+from rl_laser.core.utils.render import (  # type: ignore
     visualize_pulses, 
     visualize_controls,
     visualize_frog,
     visualize_reward
 )
-from laserenv.env_utils import extract_central_window
+from rl_laser.core.env_utils import extract_central_window  # type: ignore
 try:
     import pygame  # type: ignore  # Optional: only needed for human rendering.
 except ImportError:
@@ -88,8 +88,10 @@ class FROGLaserEnv(AbstractBaseLaser):
 
         """Parsing action-dependant parameters"""
         # Accept bounds either as a single float (symmetric range) or an iterable (explicit lower/upper)
-        if isinstance(action_bounds, (list, tuple)):
-            self.action_lower_bound, self.action_upper_bound = float(action_bounds[0]), float(action_bounds[1])
+        from collections.abc import Sequence
+        if isinstance(action_bounds, Sequence):
+            lower, upper = action_bounds  # type: ignore[arg-type]
+            self.action_lower_bound, self.action_upper_bound = float(lower), float(upper)
         else:
             self.action_lower_bound, self.action_upper_bound = -float(action_bounds), float(action_bounds)
         
