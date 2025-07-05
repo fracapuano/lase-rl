@@ -1,19 +1,37 @@
-# Optional heavy deps
+"""FROGLaserEnv implementation with optional dependency guards and strict typing."""
+
+from typing import Tuple, Sequence, Union, Optional, Dict, Any
+from collections import deque
+
 from rl_laser.core._optional import opt
 
+# --- Optional heavy dependencies -------------------------------------------------
 line_profiler = opt("line_profiler", "dev")
-
-# numpy/torch imported lazily to allow lightweight import without full stack
 np = opt("numpy", "base")
 torch = opt("torch", "torch")
+gymnasium = opt("gymnasium", "base")
+
+# only pull objects we need from gym
+Box = gymnasium.spaces.Box  # type: ignore[attr-defined]
+DictSpace = gymnasium.spaces.Dict  # type: ignore[attr-defined]
+
+plt = opt("matplotlib.pyplot", "viz")
+Image = opt("PIL.Image", "viz").Image  # type: ignore[attr-defined]
+
+MultivariateNormal = opt(
+    "torch.distributions.multivariate_normal", "torch"
+).MultivariateNormal  # type: ignore[attr-defined]
+
+try:
+    pygame = opt("pygame", "visualize")
+except ModuleNotFoundError:
+    pygame = None
+
+# ---------------------------------------------------------------------------------
 
 from typing import Tuple, List, Sequence, Union, Optional, Dict, Any, TYPE_CHECKING
-from collections import deque
 from gymnasium.spaces import Box, Dict
 from torch.distributions.multivariate_normal import MultivariateNormal
-
-# pygame is heavy to import and unused during headless training. Commented out to speed-up env loading.
-# import pygame
 import matplotlib.pyplot as plt
 from PIL import Image
 from rl_laser.core.laserenv.BaseLaser import AbstractBaseLaser  # type: ignore
@@ -26,10 +44,6 @@ from rl_laser.core.laserenv.utils.render import (  # type: ignore
     visualize_reward
 )
 from rl_laser.core.laserenv.env_utils import extract_central_window  # type: ignore
-try:
-    import pygame  # type: ignore  # Optional: only needed for human rendering.
-except ImportError:
-    pygame = None
 
 # this way, figures are not automatically shown
 plt.ioff()
@@ -80,7 +94,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         # specifiying obs space, as Dict containing:
         # - (self.window_size x self.window_size) B&W FROG traces (Box space)
         # - current control parameters psi (Box space)
-        self.observation_space = Dict({
+        self.observation_space = DictSpace({
             "frog_trace": Box(
                 low=0, high=255, shape=(1, self.window_size, self.window_size), dtype=np.uint8
             ),
@@ -195,7 +209,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         """Returns peak intensity of the controlled shape un-doing intensity normalization."""
         return physics.peak_intensity(pulse_intensity=self.pulse[-1])
     
-    def frog_trace(self, control_ps: torch.TensorType) -> torch.TensorType:
+    def frog_trace(self, control_ps: torch.Tensor) -> "torch.Tensor":
         """Returns the FROG trace of the given control parameters. Mostly used for logging."""
         return self.laser.control_to_frog(control_ps)
 
