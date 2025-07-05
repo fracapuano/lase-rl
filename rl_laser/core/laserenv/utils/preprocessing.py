@@ -4,7 +4,7 @@ from scipy.interpolate import UnivariateSpline
 from scipy.constants import c
 
 from typing import Tuple
-from laserenv.utils.funcs import get_project_root
+from rl_laser.core.utils.funcs import get_project_root
 
 def cutoff_signal(frequency_cutoff:Tuple[float, float], frequency:np.array, signal:np.array) -> Tuple[np.array, np.array]:
     """This function cuts the input signal using input frequency cutoff. It returns the cutted signal. 

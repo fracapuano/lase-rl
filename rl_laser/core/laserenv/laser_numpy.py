@@ -5,7 +5,7 @@ import pandas as pd
 from scipy.constants import c
 from typing import Tuple, Optional, Union, List
 
-from laserenv.utils.funcs import get_project_root
+from rl_laser.core.utils.funcs import get_project_root
 
 class ComputationalLaserNumpy:
     def __init__(
@@ -59,7 +59,7 @@ class ComputationalLaserNumpy:
             yb_frequency, yb_field = gain_df["Frequency (Hz)"].values, np.sqrt(gain_df["Intensity"].values)
             
             # cutting the gain frequency accordingly
-            from laserenv.utils import preprocessing
+            from rl_laser.core.utils import preprocessing
             yb_frequency, yb_field = preprocessing.cutoff_signal(
                 frequency_cutoff=(self.frequency[0], self.frequency[-1]), 
                 frequency=yb_frequency, 

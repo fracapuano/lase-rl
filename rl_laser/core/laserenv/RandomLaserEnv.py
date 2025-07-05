@@ -12,16 +12,16 @@ import pygame
 import matplotlib.pyplot as plt
 from PIL import Image
 from typing import Optional
-from laserenv.RandomBaseLaser import RandomBaseLaser
-from laserenv.env_utils import ControlUtils
-from laserenv.utils import physics
-from laserenv.utils.render import (
+from rl_laser.core.RandomBaseLaser import RandomBaseLaser
+from rl_laser.core.env_utils import ControlUtils
+from rl_laser.core.utils import physics
+from rl_laser.core.utils.render import (
     visualize_pulses, 
     visualize_controls,
     visualize_frog,
     visualize_reward
 )
-from laserenv.env_utils import extract_central_window
+from rl_laser.core.env_utils import extract_central_window
 
 # this way, figures are not automatically shown
 plt.ioff()

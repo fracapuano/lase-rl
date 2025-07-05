@@ -4,14 +4,14 @@ import numpy as np
 import torch
 from typing import Tuple
 
-from laserenv.laser import ComputationalLaser
-from laserenv.laser_numpy import ComputationalLaserNumpy
-from laserenv.utils.preprocessing import (
+from rl_laser.core.laser import ComputationalLaser
+from rl_laser.core.laser_numpy import ComputationalLaserNumpy
+from rl_laser.core.utils.preprocessing import (
     extract_data,
     cutoff_signal,
     equidistant_points
 )
-from laserenv.utils.physics import (
+from rl_laser.core.utils.physics import (
     central_frequency
 )
 

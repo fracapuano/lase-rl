@@ -1,13 +1,11 @@
+from rl_laser.core.RandomEnv import RandomEnv
 import torch
-import gymnasium as gym
-from laserenv.env_utils import instantiate_laser
-from laserenv.utils import *
+from rl_laser.core.env_utils import instantiate_laser
 
 
-class AbstractBaseLaser(gym.Env):
+class RandomBaseLaser(RandomEnv):
     """
-    Custom gymnasium env for L1 Laser Pump. 
-    This class abstracts actions and observation space.
+    Custom env class supporting randomization of dynamics parameters per DORAEMON API.
     """
     def __init__(self, 
                  bounds:torch.TensorType, 
@@ -27,6 +25,7 @@ class AbstractBaseLaser(gym.Env):
                                           the higher the non-linearity introduced in the model.
             render_mode (str, optional): Render mode. Defaults to None.
         """
+        super().__init__()
         self.device = device
         self._bounds = bounds
         

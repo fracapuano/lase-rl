@@ -4,8 +4,8 @@ from typing import List, Optional
 import numpy as np
 from collections import deque
 
-from laserenv.utils.physics import peak_on_peak
-from laserenv.env_utils import extract_central_window
+from rl_laser.core.utils.physics import peak_on_peak
+from rl_laser.core.env_utils import extract_central_window
 
 def visualize_pulses(
     pulse:List[torch.TensorType], 

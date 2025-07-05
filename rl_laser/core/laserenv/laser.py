@@ -6,13 +6,13 @@ import pandas as pd
 from scipy.constants import c
 from typing import Tuple, Optional
 
-from laserenv.utils import (
+from rl_laser.core.utils import (
     physics,
     preprocessing,
     frogtrace
 )
 
-from laserenv.utils.funcs import get_project_root
+from rl_laser.core.utils.funcs import get_project_root
 
 class ComputationalLaser: 
     def __init__(
