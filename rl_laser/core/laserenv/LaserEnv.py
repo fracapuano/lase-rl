@@ -1,6 +1,6 @@
 """FROGLaserEnv implementation with optional dependency guards and strict typing."""
 
-from typing import Tuple, Sequence, Union, Optional, Dict, Any
+from typing import Tuple, Sequence, Union, Optional, Dict, Any, TYPE_CHECKING
 from collections import deque
 
 from rl_laser.core._optional import opt
@@ -44,6 +44,16 @@ from rl_laser.core.laserenv.env_utils import extract_central_window  # type: ign
 
 # this way, figures are not automatically shown
 plt.ioff()
+
+# type checking imports and aliases
+if TYPE_CHECKING:
+    import numpy.typing as npt
+    import torch as torch_typing
+    NDArray = npt.NDArray[Any]  # type: ignore  # noqa: N816
+    Tensor = torch_typing.Tensor  # noqa: N816
+else:
+    NDArray = Any  # type: ignore  # noqa: N816
+    Tensor = Any  # type: ignore  # noqa: N816
 
 class FROGLaserEnv(AbstractBaseLaser):
     metadata = {
@@ -260,7 +270,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         return info
     
-    def remap_action(self, action:np.ndarray)->np.ndarray:
+    def remap_action(self, action: NDArray) -> NDArray:
         """
         Remaps the action from [-1, +1] to [lower_bound, upper_bound] range.
         Args: 
@@ -385,7 +395,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         return final_reward, components
 
     @line_profiler.profile
-    def step(self, action: np.ndarray) -> Tuple[Dict[str, Any], float, bool, bool, Dict[str, Any]]:
+    def step(self, action: NDArray) -> Tuple[Dict[str, Any], float, bool, bool, Dict[str, Any]]:
         """
         Applies given action on laser env. Returns observation, reward, terminated, truncated, info
         """
