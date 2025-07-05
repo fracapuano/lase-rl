@@ -8,7 +8,8 @@ from collections import deque
 from gymnasium.spaces import Box, Dict
 from torch.distributions.multivariate_normal import MultivariateNormal
 
-import pygame
+# pygame is heavy to import and unused during headless training. Commented out to speed-up env loading.
+# import pygame
 import matplotlib.pyplot as plt
 from PIL import Image
 from typing import Optional
@@ -22,6 +23,10 @@ from laserenv.utils.render import (
     visualize_reward
 )
 from laserenv.env_utils import extract_central_window
+try:
+    import pygame  # Optional: only needed for human rendering.
+except ImportError:
+    pygame = None
 
 # this way, figures are not automatically shown
 plt.ioff()
@@ -82,11 +87,11 @@ class FROGLaserEnv(AbstractBaseLaser):
         })
 
         """Parsing action-dependant parameters"""
-        # custom bounds for env
-        if isinstance(action_bounds, list): 
+        # Accept bounds either as a single float (symmetric range) or an iterable (explicit lower/upper)
+        if isinstance(action_bounds, (list, tuple)):
             self.action_lower_bound, self.action_upper_bound = action_bounds
         else:
-            self.action_lower_bound, self.action_upper_bound = -action_bounds, +action_bounds
+            self.action_lower_bound, self.action_upper_bound = -float(action_bounds), float(action_bounds)
         
         # action range
         self.action_range = self.action_upper_bound - self.action_lower_bound
@@ -128,6 +133,10 @@ class FROGLaserEnv(AbstractBaseLaser):
         
         # setting the simulator in empty state
         self.reset()
+
+        self._cached_psi = None  # cache for last psi that generated expensive computations
+        self._cached_pulse = None
+        self._cached_frog = None
     
     @property
     def psi(self):
@@ -149,14 +158,23 @@ class FROGLaserEnv(AbstractBaseLaser):
     
     @property
     def pulse(self):
-        """Returns the temporal profile of the pulse that derives from the current observation"""
-        time, control_shape = self.laser.control_to_temporal(self.psi_picoseconds)
-        return (time, control_shape)
+        # Returns the temporal profile of the pulse associated with the current control parameters,
+        # re-computing it only if the control changed.
+        if self._cached_psi is None or not torch.equal(self.psi, self._cached_psi) or self._cached_pulse is None:
+            time, control_shape = self.laser.control_to_temporal(self.psi_picoseconds)
+            self._cached_pulse = (time, control_shape)
+            self._cached_psi = self.psi.clone()
+            # Pulse changed -> frog no longer valid
+            self._cached_frog = None
+        return self._cached_pulse
     
     @property
     def frog(self):
-        """Returns the FROG trace of the current control parameter."""
-        return self.laser.control_to_frog(self.psi_picoseconds)
+        # Returns the FROG trace for the current control parameters, using cached value when possible.
+        if self._cached_frog is None or self._cached_psi is None or not torch.equal(self.psi, self._cached_psi):
+            self._cached_frog = self.laser.control_to_frog(self.psi_picoseconds)
+            self._cached_psi = self.psi.clone()
+        return self._cached_frog
     
     @property
     def pulse_FWHM(self):
@@ -277,6 +295,11 @@ class FROGLaserEnv(AbstractBaseLaser):
             #     self.control_utils.control_magnify(compressor_params_distr.sample())
             # )
 
+        # Clear caches on reset
+        self._cached_psi = None
+        self._cached_pulse = None
+        self._cached_frog = None
+
         return self._get_obs(), self._get_info()
 
     def is_terminated(self) -> bool:
@@ -354,6 +377,10 @@ class FROGLaserEnv(AbstractBaseLaser):
             torch.zeros(self.action_dim), 
             torch.ones(self.action_dim)
         )
+        # Invalidate caches after state change
+        self._cached_psi = None
+        self._cached_pulse = None
+        self._cached_frog = None
         
         self.controls_buffer.append(self.psi)
         reward, components = self.get_reward()

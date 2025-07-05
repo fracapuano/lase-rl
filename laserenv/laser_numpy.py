@@ -13,7 +13,7 @@ class ComputationalLaserNumpy:
                 frequency: np.ndarray, 
                 field: np.ndarray, 
                 compressor_params: Tuple[float, float, float],
-                num_points_padding: int = int(5e4), 
+                num_points_padding: int = 8192, 
                 B: float = 2, 
                 central_frequency: float = (c/(1030*1e-9)), 
                 cristal_frequency: Optional[np.ndarray]=None, 
@@ -27,7 +27,7 @@ class ComputationalLaserNumpy:
             field (np.ndarray): Array of electrical field (measured with respect to the frequency).
             compressor_params (Tuple[float, float, float]): Compressor GDD, TOD and FOD in SI units.
             central_frequency (float, optional): Central frequency, may be derived from central wavelength. Defaults to (c/(1030*1e-9)) Hz.
-            num_points_padding (int, optional): Number of points to be used to pad. Defaults to int(5e4).
+            num_points_padding (int, optional): Number of points to be used to pad. Defaults to 8192.
             B (float, optional): B-integral value. Used to model the non-linear effects that DIRA has on the beam.
             cristal_frequency (np.ndarray, optional): Frequency (THz) of the amplification in the non-linear crystal at the beginning of DIRA.
             cristal_intensity (np.ndarray, optional): Intensity of the amplification in the non-linear crystal at the beginning of DIRA.
@@ -346,7 +346,7 @@ class ComputationalLaserNumpy:
             self, 
             control: np.ndarray, 
             return_axes: bool = False, 
-            npoints_pad: int = int(1e4),
+            npoints_pad: int = 2048,
             trim_window: int = int(1e3)
         ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray, np.ndarray]]: 
         """This function returns the FROG trace of the pulse for a given control.
@@ -354,7 +354,7 @@ class ComputationalLaserNumpy:
         Args:
             control (np.ndarray): Control values to use in the forward pass. Must be dispersion coefficients, given in SI units 
             return_axes (bool, optional): Whether or not to return the axes of the FROG trace. Defaults to False.
-            npoints_pad (int, optional): Number of points to pad the FROG trace. Defaults to 10000.
+            npoints_pad (int, optional): Number of points to pad the FROG trace. Defaults to 2048.
             trim_window (int, optional): Trim window size. Defaults to 1000.
 
         Returns:
