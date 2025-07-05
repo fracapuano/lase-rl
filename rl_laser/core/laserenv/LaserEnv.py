@@ -1,9 +1,13 @@
-import line_profiler
+# Optional heavy deps
+from rl_laser.core._optional import opt
 
-import torch
+line_profiler = opt("line_profiler", "dev")
 
-import numpy as np
-from typing import Tuple, List, Sequence, Union
+# numpy/torch imported lazily to allow lightweight import without full stack
+np = opt("numpy", "base")
+torch = opt("torch", "torch")
+
+from typing import Tuple, List, Sequence, Union, Optional, Dict, Any, TYPE_CHECKING
 from collections import deque
 from gymnasium.spaces import Box, Dict
 from torch.distributions.multivariate_normal import MultivariateNormal
@@ -12,17 +16,16 @@ from torch.distributions.multivariate_normal import MultivariateNormal
 # import pygame
 import matplotlib.pyplot as plt
 from PIL import Image
-from typing import Optional
-from rl_laser.core.BaseLaser import AbstractBaseLaser  # type: ignore
-from rl_laser.core.env_utils import ControlUtils  # type: ignore
-from rl_laser.core.utils import physics  # type: ignore
-from rl_laser.core.utils.render import (  # type: ignore
+from rl_laser.core.laserenv.BaseLaser import AbstractBaseLaser  # type: ignore
+from rl_laser.core.laserenv.env_utils import ControlUtils  # type: ignore
+from rl_laser.core.laserenv.utils import physics  # type: ignore
+from rl_laser.core.laserenv.utils.render import (  # type: ignore
     visualize_pulses, 
     visualize_controls,
     visualize_frog,
     visualize_reward
 )
-from rl_laser.core.env_utils import extract_central_window  # type: ignore
+from rl_laser.core.laserenv.env_utils import extract_central_window  # type: ignore
 try:
     import pygame  # type: ignore  # Optional: only needed for human rendering.
 except ImportError:
@@ -107,7 +110,10 @@ class FROGLaserEnv(AbstractBaseLaser):
         )
 
         """Parsing reward-dependant parameters"""
-        # laser characteristic specifics
+        # run-time type for IDEs / mypy
+        from rl_laser.core.laserenv.laser_numpy import ComputationalLaserNumpy  # type: ignore
+        self.laser: ComputationalLaserNumpy  # type: ignore
+
         self.transform_limited = self.laser.transform_limited()
         # control utils - suite to handle with ease normalization of control params
         self.control_utils = ControlUtils()  # initialized with default parameters 
@@ -255,7 +261,11 @@ class FROGLaserEnv(AbstractBaseLaser):
         normalized = (action + 1) / 2
         return self.action_lower_bound + normalized * self.action_range
 
-    def reset(self, seed:int=None, options=None)->Tuple[np.ndarray, dict]: 
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]: 
         """Resets the environment to initial observations"""
         # Set the seed if provided
         if seed is not None:
@@ -325,7 +335,7 @@ class FROGLaserEnv(AbstractBaseLaser):
         truncated = self.n_steps >= self.MAX_STEPS
         return bool(truncated)
 
-    def get_reward(self)->float:
+    def get_reward(self) -> Tuple[float, Dict[str, float]]:
         """
         This function computes the reward associated with the (state, action) pair. 
         This reward function is made up of several different components and derives from fundamental assumptions
