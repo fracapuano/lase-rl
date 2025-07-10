@@ -43,7 +43,13 @@ def parse_args():
     parser.add_argument("--eval-every", type=int, default=5_000,
                       help="Evaluate and record video every N steps")
     parser.add_argument("--udr", action="store_true", default=False,
-                      help="Use UDR")
+                      help="Use UDR.")
+    parser.add_argument("--udr-low", type=float, default=1.5,
+                      help="Lower bound of UDR. Ignored if --udr is not passed.")
+    parser.add_argument("--udr-high", type=float, default=2.5,
+                      help="Upper bound of UDR. Ignored if --udr is not passed.")
+    parser.add_argument("--frame-stack", type=int, default=5,
+                      help="Frame stack for the environment.")
     
     return parser.parse_args()
 
@@ -58,16 +64,16 @@ def main():
         sync_tensorboard=True,
         monitor_gym=True,
         config={
-            "policy": "CnnPolicy",
+            "policy": "MultiInputPolicy",
             "algorithm": args.algo,
             "timesteps": args.timesteps,
             "learning_rate": args.learning_rate,
             "seed": args.seed,
-            "frame_stack": 5,
+            "frame_stack": args.frame_stack,
             "n_envs": n_envs,
-            "udr": args.udr
-        },
-        notes="miniSAC, uses only psi",
+            "udr": args.udr,
+            "udr_bounds": (args.udr_low, args.udr_high)
+        }
     )
     
     # Create run directory for all assets
@@ -84,7 +90,9 @@ def main():
             compressor_params=compressor_params,
             B_integral=B_integral,
             device=device,
-            udr=args.udr
+            udr=args.udr,
+            udr_low=args.udr_low,
+            udr_high=args.udr_high
         )
 
         env = Monitor(env)
