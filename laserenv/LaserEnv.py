@@ -51,7 +51,9 @@ class FROGLaserEnv(AbstractBaseLaser):
         device:str="cpu",
         window_size:int=64,
         env_kwargs:dict={},
-        udr:bool=False
+        udr:bool=False,
+        udr_low:float=1.5,
+        udr_high:float=2.5
     ) -> None:
         # env parametrization init - chagepoint for different xi's.
         super().__init__(
@@ -62,8 +64,12 @@ class FROGLaserEnv(AbstractBaseLaser):
             render_mode=render_mode, 
             device=device
         )
-        """When true, the environment will sample random dynamics parameters at each reset."""
+        """When true, the environment will sample random dynamics parameters at each reset. Only updates B"""
         self.udr = udr
+        self.udr_low = udr_low
+        self.udr_high = udr_high
+        
+        self._B_value = B_integral
 
         """Specifying observation space"""
         self.psi_dim = 3
@@ -221,6 +227,7 @@ class FROGLaserEnv(AbstractBaseLaser):
             "TL-L1Loss": self.transform_limited_regret(),
             "FWHM-failure": terminated if terminated is not None else False,
             "Timesteps-failure": truncated if truncated is not None else False,
+            "B-value": self._B_value
         }
         if reward_components is not None:
             info.update(reward_components)
@@ -269,7 +276,13 @@ class FROGLaserEnv(AbstractBaseLaser):
         self.get_reward()
         """Quick and dirty way of doing easy UDR"""
         if self.udr:
-            B_distr = torch.distributions.uniform.Uniform(low=1.5, high=2.5)
+            B_distr = torch.distributions.uniform.Uniform(low=self.udr_low, high=self.udr_high)
+            self._B_value = B_distr.sample().type(torch.float16).item()
+            # samples dynamics parameters
+            self.laser.overwrite_B_integral(
+                self._B_value
+            )
+            # NOTE: the following code can be used to sample the compressor parameters from distributions too
             # compressor_scaled = self.control_utils.controls_demagnify(self.compressor_params)
             
             # # gdd_delta, tod_delta, fod_delta = 20, 10, 10*1e-2
@@ -278,14 +291,10 @@ class FROGLaserEnv(AbstractBaseLaser):
             #     low=compressor_scaled - torch.tensor([gdd_delta, tod_delta, fod_delta]),
             #     high=compressor_scaled + torch.tensor([gdd_delta, tod_delta, fod_delta])
             # )
-            # samples dynamics parameters
-            self.laser.overwrite_B_integral(
-                B_distr.sample().type(torch.float16).item()
-            )
+
             # self.laser.overwrite_compressor_params(
             #     self.control_utils.control_magnify(compressor_params_distr.sample())
             # )
-
 
         return self._get_obs(), self._get_info()
 

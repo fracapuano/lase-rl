@@ -403,8 +403,8 @@ class RandomFROGLaserEnv(RandomBaseLaser):
         self.n_steps += 1
         # overwriting currently stored action with incoming action
         self.action = action
+        
         # scaling the action to the actual range
-
         rescaled_action = self.remap_action(action=action)
         # applying (rescaled) action, clipping between 0 and 1
         self.psi = np.clip(
