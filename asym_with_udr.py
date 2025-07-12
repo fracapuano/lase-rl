@@ -8,98 +8,103 @@ from stable_baselines3.common.callbacks import CallbackList, EveryNTimesteps
 from callbacks import FROGWhileTrainingCallback
 from wandb.integration.sb3 import WandbCallback
 
-# First, define which observations should be available to actor and critic
-actor_obs_keys = ["frog_trace", "psi", "action"]  # Limited info for actor
-critic_obs_keys = ["frog_trace", "psi", "action", "B_integral", "compressor_GDD"]  # Full info for critic
 
-# Number of vectorized environments to run
-n_envs = 4
-# How many frames to stack when forming an observation
-frame_stack = 5
+def main():
+    # First, define which observations should be available to actor and critic
+    actor_obs_keys = ["frog_trace", "psi", "action"]  # Limited info for actor
+    critic_obs_keys = ["frog_trace", "psi", "action", "B_integral", "compressor_GDD"]  # Full info for critic
 
-# Bounds for UDR
-udr_low = 1.5
-udr_high = 2.5
+    # Number of vectorized environments to run
+    n_envs = 4
+    # How many frames to stack when forming an observation
+    frame_stack = 5
 
-enable_frog_callback = True
+    # Bounds for UDR
+    udr_low = 1.5
+    udr_high = 2.5
 
-# Create environment (assuming FROGLaserEnv or similar)
-def make_env():
-    env = gym.make("LaserEnv", render_mode="human", udr=True, udr_low=udr_low, udr_high=udr_high)
-    return env
+    # Create environment (assuming FROGLaserEnv or similar)
+    def make_env():
+        env = gym.make("LaserEnv", render_mode="human", udr=True, udr_low=udr_low, udr_high=udr_high)
+        return env
 
-env = DummyVecEnv([make_env for _ in range(n_envs)])
-env = VecFrameStack(env, n_stack=frame_stack)
+    enable_frog_callback = True
 
-# Create the policy with asymmetric information
-policy = Policy(
-    algo="sac",
-    env=env,
-    lr=3e-4,
-    gamma=0.9,
-    device="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu",
-    # These masks define which observations are passed to actor/critic
-    actor_obs_mask=actor_obs_keys,
-    critic_obs_mask=critic_obs_keys
-)
+    # First, define which observations should be available to actor and critic
+    env = DummyVecEnv([make_env for _ in range(n_envs)])
+    env = VecFrameStack(env, n_stack=frame_stack)
 
-# extracting the model
-model = policy.model
-timesteps = 20
-
-
-run = wandb.init(
-    project="RLC-Laser",
-    sync_tensorboard=True,
-    monitor_gym=True,
-    config={
-        "algorithm": "asym-sac",
-        "timesteps": timesteps,
-        "learning_rate": 3e-4,
-        "frame_stack": frame_stack,
-        "n_envs": n_envs,
-        "udr": True,
-        "udr_low": udr_low,
-        "udr_high": udr_high
-    },
-    notes="Asymmetric SAC with UDR",
-)
-
-# Setup the Wandb callback to log training progress, including gradient information.
-wandb_callback = WandbCallback(
-    gradient_save_freq=100,
-    verbose=2
-)
-
-callback = CallbackList([
-    wandb_callback,
-])
-
-if enable_frog_callback:
-    frog_callback = FROGWhileTrainingCallback(
+    # Create the policy with asymmetric information
+    policy = Policy(
+        algo="sac",
         env=env,
-        n_eval_episodes=10,
-        best_model_path="./"
+        lr=3e-4,
+        gamma=0.9,
+        device="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu",
+        # These masks define which observations are passed to actor/critic
+        actor_obs_mask=actor_obs_keys,
+        critic_obs_mask=critic_obs_keys
     )
 
-    frog_callback = EveryNTimesteps(
-        n_steps=5000,
-        callback=frog_callback
+    # extracting the model
+    model = policy.model
+    timesteps = 200_000
+
+    run = wandb.init(
+        project="RLC-Laser",
+        sync_tensorboard=True,
+        monitor_gym=True,
+        config={
+            "algorithm": "asym-sac",
+            "timesteps": timesteps,
+            "learning_rate": 3e-4,
+            "frame_stack": frame_stack,
+            "n_envs": n_envs,
+            "udr": True,
+            "udr_low": udr_low,
+            "udr_high": udr_high
+        },
+        notes="Asymmetric SAC with UDR",
     )
+
+    # Setup the Wandb callback to log training progress, including gradient information.
+    wandb_callback = WandbCallback(
+        gradient_save_freq=100,
+        verbose=2
+    )
+
     callback = CallbackList([
         wandb_callback,
-        frog_callback
     ])
 
+    if enable_frog_callback:
+        frog_callback = FROGWhileTrainingCallback(
+            env=env,
+            n_eval_episodes=10,
+            best_model_path="./"
+        )
 
-# Begin training
-model.learn(
-    total_timesteps=timesteps,
-    callback=callback, 
-    progress_bar=True
-)
+        frog_callback = EveryNTimesteps(
+            n_steps=5000,
+            callback=frog_callback
+        )
+        callback = CallbackList([
+            wandb_callback,
+            frog_callback
+        ])
 
-# save model
-model.save(f"asym_with_udr_{udr_low}_{udr_high}.zip")
 
-wandb.finish()
+    # Begin training
+    model.learn(
+        total_timesteps=timesteps,
+        callback=callback, 
+        progress_bar=True
+    )
+
+    # save model
+    model.save(f"asym_with_udr_{udr_low}_{udr_high}.zip")
+
+    wandb.finish()
+
+if __name__ == "__main__":
+    main()

@@ -1,10 +1,6 @@
 import gymnasium as gym
-from stable_baselines3 import PPO, SAC
-import laserenv
+from stable_baselines3 import SAC
 
-import numpy as np
-
-from stable_baselines3.common.vec_env import VecFrameStack, DummyVecEnv
 from stable_baselines3.common.env_util import make_vec_env
 from utils import make_wrapped_environment
 from laserenv.RandomVecEnv import RandomDummyVecEnv
@@ -15,6 +11,8 @@ def main():
     render = True
     dr = False  # whether to randomize or not at eval time
     env_name = "RandomLaserEnv"
+
+    n_test_episodes = 25
 
     env = make_vec_env(
         env_name,
@@ -39,7 +37,7 @@ def main():
     
     # Evaluation loop
     average_reward = 0
-    for _ in range(10):
+    for _ in range(n_test_episodes):
         obs = env.reset()
         
         episode_reward = 0
@@ -55,7 +53,7 @@ def main():
     
         average_reward += episode_reward
 
-    print(f"Average Reward: {average_reward / 10}")
+    print(f"Average Reward: {average_reward / n_test_episodes}")
     env.close()
 
 if __name__ == "__main__": 
